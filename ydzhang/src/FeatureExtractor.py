@@ -2,9 +2,9 @@ from torch import nn
 import torch
 import torch.functional as F
 
-class AnswerFeatureExtractor(nn.Module):
+class SimpleFeatureExtractor(nn.Module):
     """
-    问题回答特征提取，包括语义特征　和　质量特征
+    特征提取，包括稀疏类别特征　和　连续数量特征
     """
     def __init__(self,
                  feature_dim_dict,
@@ -15,7 +15,7 @@ class AnswerFeatureExtractor(nn.Module):
         :param feature_dim_dict: dict,to indicate sparse field and dense field like {'sparse':{'field_1':4,'field_2':3,'field_3':2},'dense':['field_4','field_5']}
 
         """
-        super(AnswerFeatureExtractor, self).__init__()
+        super(SimpleFeatureExtractor, self).__init__()
         self.feature_dim_dict = feature_dim_dict
         self.embedding_layer_dict = nn.ModuleDict()
         for sparse_feat, feat_dim in feature_dim_dict['sparse'].item():
@@ -37,11 +37,11 @@ class AnswerFeatureExtractor(nn.Module):
 
         sparse_feature_concated = torch.cat(sparse_feature_embeddings, dim= -1)
 
-        dense_feature_concated = torch.cat(input_dict['dense'].values, dim= -1)
+        dense_feature_concated = torch.cat(input_dict['dense'].values(), dim= -1)
 
         feature_concated = torch.cat([sparse_feature_concated, dense_feature_concated], dim= -1)
 
-        output = nn.ReLU()(feature_concated)
+        output = nn.ReLU()(self.linear(feature_concated))
 
         return output
 

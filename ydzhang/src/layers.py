@@ -53,35 +53,3 @@ class BiLSTMRCNN(nn.Module):
         return output
 
 
-class MLP(nn.Module):
-    def __init__(self, params, use_batchnorm=True, use_dropout=True):
-        super(MLP, self).__init__()
-
-        self.embedding_size = params['embedding_size']
-        self.field_size = params['field_size']
-        self.hidden_dims = params['hidden_dims']
-        self.device = params['device']
-        self.p = params['p']
-        self.use_batchnorm = use_batchnorm
-        self.use_dropout = use_dropout
-
-        self.input_dim = self.field_size * self.embedding_size
-        self.num_layers = len(self.hidden_dims)
-
-        ## deep weights
-        self.deep_layers = nn.Sequential()
-
-        net_dims = [self.input_dim] + self.hidden_dims
-        for i in range(self.num_layers):
-            self.deep_layers.add_module('fc%d' % (i + 1), nn.Linear(net_dims[i], net_dims[i + 1]).to(self.device))
-            if self.use_batchnorm:
-                self.deep_layers.add_module('bn%d' % (i + 1), nn.BatchNorm1d(net_dims[i + 1]).to(self.device))
-            self.deep_layers.add_module('relu%d' % (i + 1), nn.ReLU().to(self.device))
-            if self.use_dropout:
-                self.deep_layers.add_module('dropout%d' % (i + 1), nn.Dropout(self.p).to(self.device))
-
-    def forward(self, embeddings):
-        deepInput = embeddings.reshape(embeddings.shape[0], self.input_dim)
-        deepOut = self.deep_layers(deepInput)
-        return deepOut
-
