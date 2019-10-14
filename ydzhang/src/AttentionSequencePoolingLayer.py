@@ -8,7 +8,6 @@ import torch.nn.functional as F
 class AttentionSequencePoolingLayer(nn.Module):
     def __init__(self, embedding_dim=4):
         super(AttentionSequencePoolingLayer, self).__init__()
-        # TODO: attention weight normalization
         self.local_att = LocalActivationUnit(hidden_size=[64, 16], bias=[True, True], embedding_dim=embedding_dim, batch_norm=False)
 
 
@@ -40,7 +39,7 @@ class LocalActivationUnit(nn.Module):
     def __init__(self, hidden_size=[80, 40], bias=[True, True], embedding_dim=4, batch_norm=False):
         super(LocalActivationUnit, self).__init__()
         # TODO:
-        self.fc1 = FullyConnectedLayer(input_size= 4 *embedding_dim,
+        self.fc1 = FullyConnectedLayer(input_size= 2 * embedding_dim,
                                        hidden_size=hidden_size,
                                        bias=bias,
                                        batch_norm=batch_norm,
@@ -52,18 +51,29 @@ class LocalActivationUnit(nn.Module):
     def forward(self, query, user_behavior):
         # query ad            : size -> batch_size * 1 * embedding_size
         # user behavior       : size -> batch_size * time_seq_len * embedding_size
-
+        # query embedding must be the same size as user behavior embedding
         user_behavior_len = user_behavior.size(1)
         queries = torch.cat([query for _ in range(user_behavior_len)], dim=1)
 
-        attention_input = torch.cat([queries, user_behavior, queries -user_behavior, queries *user_behavior], dim=-1)
+        attention_input = torch.cat([queries, user_behavior], dim=-1)
         attention_output = self.fc1(attention_input)
 
         return attention_output
 
-#     TODO:
 class BiInteractionActivationUnit(nn.Module):
     def __init__(self,
                  query_dim,
                  hist_behavior_dim):
-        pass
+        self.query_dim = query_dim
+        self.hist_behavior_dim = hist_behavior_dim
+        self.biInt_weight = nn.Parameter(torch.Tensor(query_dim, hist_behavior_dim))
+        nn.init.xavier_normal_(self.biInt_weight)
+
+
+    def forward(self, query, hist_behavior):
+        # TODO:
+        attention_logits = torch.einsum('bq, qh, blh->bl1', query, self.biInt_weight, hist_behavior)
+        return attention_logits
+
+    def extra_repr(self):
+        return "BiInteractionAttentionUnit: %d * %d -> 1" %(self.query_dim, self.hist_behavior_dim)
