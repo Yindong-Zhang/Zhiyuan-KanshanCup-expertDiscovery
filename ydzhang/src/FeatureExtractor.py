@@ -18,7 +18,7 @@ class SimpleFeatureExtractor(nn.Module):
         super(SimpleFeatureExtractor, self).__init__()
         self.feature_dim_dict = feature_dim_dict
         self.embedding_layer_dict = nn.ModuleDict()
-        for sparse_feat, feat_dim in feature_dim_dict['sparse'].item():
+        for sparse_feat, feat_dim in feature_dim_dict['sparse'].items():
             self.embedding_layer_dict[sparse_feat] = nn.Embedding(feat_dim, embedding_size)
         self.embedding_size = embedding_size
         self.hidden_size = embedding_size * len(feature_dim_dict['sparse']) + len(feature_dim_dict['dense'])
@@ -28,16 +28,16 @@ class SimpleFeatureExtractor(nn.Module):
     def forward(self, input_dict):
         """
 
-        :param input_dict: a input dict like {'sparse': {'field_1': feature_column, 'field_2': feature_column}, 'dense': {'field_3': feature column, 'field 4': feature_column'}}
+        :param input_dict: a input dict like {'sparse': {'field_1': (batchsize, ), 'field_2': (batchsize, )}, 'dense': {'field_3': (batchsize, 1), 'field 4': (batchsize, 1)}}
         :return:
         """
         sparse_feature_embeddings = []
-        for sparse_feat, feat_column in input_dict['sparse'].item():
+        for sparse_feat, feat_column in input_dict['sparse'].items():
             sparse_feature_embeddings.append(self.embedding_layer_dict[sparse_feat](feat_column))
 
         sparse_feature_concated = torch.cat(sparse_feature_embeddings, dim= -1)
 
-        dense_feature_concated = torch.cat(input_dict['dense'].values(), dim= -1)
+        dense_feature_concated = torch.cat(list(input_dict['dense'].values()), dim= -1)
 
         feature_concated = torch.cat([sparse_feature_concated, dense_feature_concated], dim= -1)
 
@@ -47,3 +47,14 @@ class SimpleFeatureExtractor(nn.Module):
 
     def extra_repr(self):
         return "AnswerFeature: %s with embedding size %d to hidden variable with dim %d" %(self.feature_dim_dict, self.embedding_size, self.output_dim)
+
+
+if __name__ == '__main__':
+    input_dim_dict = {'sparse': {'a': 5, 'b': 12}, 'dense': ['d', 'e']}
+    batchsize = 5
+    input = {'sparse': {'a': torch.randint(0, 5, (batchsize, )), 'b': torch.randint(0, 12, (batchsize, ))},
+             'dense': {'d': torch.randn((batchsize, 1)), 'e': torch.randn((batchsize, 1))}}
+    t = SimpleFeatureExtractor(input_dim_dict, 16, 128)
+
+    out = t(input)
+    print(out.detach().numpy())
