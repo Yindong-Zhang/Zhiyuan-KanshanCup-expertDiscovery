@@ -5,12 +5,12 @@ import torch.nn.functional as F
 from src.layers import FullyConnectedLayer
 
 
-class AttentionSequencePoolingLayer(nn.Module):
+class SequenceAttentionPoolingLayer(nn.Module):
     def __init__(self,
                  query_dim,
                  user_hist_dim,
                  ):
-        super(AttentionSequencePoolingLayer, self).__init__()
+        super(SequenceAttentionPoolingLayer, self).__init__()
         self.query_dim = query_dim
         self.user_hist_dim = user_hist_dim
         # self.local_att = LocalActivationUnit(query_dim, user_hist_dim, hidden_size=[64, 16], bias=[True, True], batch_norm=False)
@@ -35,9 +35,9 @@ class AttentionSequencePoolingLayer(nn.Module):
 
         attention_score = F.softmax(output, dim= -1)
         # multiply weight
-        output = torch.matmul(attention_score, hist_behavior)
+        output = torch.matmul(attention_score, hist_behavior) # shape: b, 1, d_h
 
-        return output
+        return output.squeeze(1) # shape: b, d_h
 
 
 class LocalActivationUnit(nn.Module):
@@ -90,6 +90,6 @@ if __name__ == '__main__':
     hist_behavior = torch.randn(3, 10, 100)
     hist_length = 8 * torch.ones(3, 1)
 
-    a = AttentionSequencePoolingLayer(200, 100)
+    a = SequenceAttentionPoolingLayer(200, 100)
     out = a(query, hist_behavior, hist_length).detach().numpy()
     print(out)
