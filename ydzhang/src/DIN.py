@@ -19,11 +19,6 @@ class DIN(nn.Module):
         self.hist_behavior_dim = hist_behavior_dim
         self.user_profile_dim = user_profile_dim
         self.hidden_dims = hidden_dim_list
-        feature_embeddings = torch.empty(self.feature_size + 1, self.embedding_size,
-                                         dtype=torch.float32, device=self.device,
-                                         requires_grad=True)
-        nn.init.normal_(feature_embeddings)
-        self.feature_embeddings = nn.Parameter(feature_embeddings)
         self.sequenceAttentionPoolingLayer= SequenceAttentionPoolingLayer(self.query_dim, self.hist_behavior_dim)
 
         self.concated_dim = self.query_dim + self.hist_behavior_dim + self.user_profile_dim
@@ -34,11 +29,24 @@ class DIN(nn.Module):
                                                 dropout_rate= dropout)
 
     def forward(self, query_embedding, hist_embedding, hist_length, user_profile_embedding):
+
+        # add wide part of model ?
         hist_pooled_embedding = self.sequenceAttentionPoolingLayer(query_embedding, hist_embedding, hist_length)
 
-        embed_concated = torch.cat([query_embedding, hist_pooled_embedding, user_profile_embedding])
+        embed_concated = torch.cat([query_embedding, hist_pooled_embedding, user_profile_embedding], dim= -1)
 
 
         logits = self.output_layer(embed_concated)
 
         return logits
+
+
+if __name__ == '__main__':
+    query = torch.randn(3, 200)
+    hist_behavior = torch.randn(3, 10, 100)
+    hist_length = 8 * torch.ones(3, 1)
+    user_profile_embedding = torch.randn(3, 300)
+
+    t = DIN(200, 100, 300)
+    out = t(query, hist_behavior, hist_length, user_profile_embedding)
+    print(out.detach().numpy())

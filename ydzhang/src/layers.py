@@ -57,12 +57,11 @@ class FullyConnectedLayer(nn.Module):
     def __init__(self, input_size, hidden_size, bias= True, batch_norm=True, dropout_rate=0.5, activation='relu',
                  sigmoid=False):
         super(FullyConnectedLayer, self).__init__()
-        assert len(hidden_size) >= 1 and len(bias) >= 1
-        assert len(bias) == len(hidden_size)
+        assert len(hidden_size) >= 1
         self.sigmoid = sigmoid
 
         layers = []
-        layers.append(nn.Linear(input_size, hidden_size[0], bias=bias[0]))
+        layers.append(nn.Linear(input_size, hidden_size[0], bias=bias))
 
         for i, h in enumerate(hidden_size[:-1]):
             if batch_norm:
@@ -76,7 +75,7 @@ class FullyConnectedLayer(nn.Module):
                 raise NotImplementedError
 
             layers.append(nn.Dropout(p=dropout_rate))
-            layers.append(nn.Linear(hidden_size[i], hidden_size[i + 1], bias=bias[i]))
+            layers.append(nn.Linear(hidden_size[i], hidden_size[i + 1], bias=bias))
 
         self.fc = nn.Sequential(*layers)
         if self.sigmoid:
