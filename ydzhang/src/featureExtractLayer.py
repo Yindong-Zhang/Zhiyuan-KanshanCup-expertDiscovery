@@ -2,7 +2,7 @@ from torch import nn
 import torch
 import torch.functional as F
 
-class SimpleFeatureExtractor(nn.Module):
+class EmbeddingMLPLayer(nn.Module):
     """
     特征提取，包括稀疏类别特征　和　连续数量特征
     """
@@ -15,7 +15,7 @@ class SimpleFeatureExtractor(nn.Module):
         :param feature_dim_dict: dict,to indicate sparse field and dense field like {'sparse':{'field_1':4,'field_2':3,'field_3':2},'dense':['field_4','field_5']}
 
         """
-        super(SimpleFeatureExtractor, self).__init__()
+        super(EmbeddingMLPLayer, self).__init__()
         self.feature_dim_dict = feature_dim_dict
         self.embedding_layer_dict = nn.ModuleDict()
         for sparse_feat, feat_dim in feature_dim_dict['sparse'].items():
@@ -49,12 +49,22 @@ class SimpleFeatureExtractor(nn.Module):
         return "AnswerFeature: %s with embedding size %d to hidden variable with dim %d" %(self.feature_dim_dict, self.embedding_size, self.output_dim)
 
 
+def questionFeatureMerge(title_feat, describe_feat, topic_feat):
+    """
+
+    :param title_feat: (b, d_tl)
+    :param describe_feat: (b, d_ds)
+    :param topic_feat: (b, d_tp)
+    :return:
+    """
+    return torch.cat([title_feat, describe_feat, topic_feat], dim= -1)
+
 if __name__ == '__main__':
     input_dim_dict = {'sparse': {'a': 5, 'b': 12}, 'dense': ['d', 'e']}
     batchsize = 5
     input = {'sparse': {'a': torch.randint(0, 5, (batchsize, )), 'b': torch.randint(0, 12, (batchsize, ))},
              'dense': {'d': torch.randn((batchsize, 1)), 'e': torch.randn((batchsize, 1))}}
-    t = SimpleFeatureExtractor(input_dim_dict, 16, 128)
+    t = EmbeddingMLPLayer(input_dim_dict, 16, 128)
 
     out = t(input)
     print(out.detach().numpy())

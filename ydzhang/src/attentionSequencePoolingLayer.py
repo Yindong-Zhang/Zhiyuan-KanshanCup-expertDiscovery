@@ -78,7 +78,6 @@ class BiInteractionActivationUnit(nn.Module):
 
 
     def forward(self, query, hist_behavior):
-        # TODO:
         attention_logits = torch.einsum('bq, qh, blh->bl', query, self.biInt_weight, hist_behavior)
         return attention_logits[..., None] # shape -> b, l, 1
 

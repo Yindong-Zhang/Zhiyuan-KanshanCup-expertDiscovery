@@ -1,7 +1,7 @@
 from torch import nn
 import torch
 import torch.functional as F
-from src.AttentionSequencePoolingLayer import SequenceAttentionPoolingLayer
+from src.attentionSequencePoolingLayer import SequenceAttentionPoolingLayer
 from src.layers import FullyConnectedLayer
 
 # TODO:
