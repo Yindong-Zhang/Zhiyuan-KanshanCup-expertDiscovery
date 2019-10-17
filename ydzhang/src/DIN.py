@@ -21,7 +21,7 @@ class DIN(nn.Module):
         self.user_profile_dim = user_profile_dim
         self.hidden_dims = hidden_dim_list
         self.sequenceAttentionPoolingLayer= SequenceAttentionPoolingLayer(self.query_dim, self.hist_behavior_dim)
-
+        self.no_hist_embedding = nn.Parameter(torch.randn((self.hist_behavior_dim, )))
         self.concated_dim = self.query_dim + self.hist_behavior_dim + self.user_profile_dim
         self.output_layer = FullyConnectedLayer(self.concated_dim,
                                                 self.hidden_dims,
@@ -33,7 +33,8 @@ class DIN(nn.Module):
 
         # add wide part of model ?
         hist_pooled_embedding = self.sequenceAttentionPoolingLayer(query_embedding, hist_embedding, hist_length)
-
+        print('number of zero length history %d' %(torch.sum(hist_length == 0), ))
+        hist_pooled_embedding = torch.where(hist_length == 0, hist_pooled_embedding, self.no_hist_embedding) # amazing shape broadcast
         embed_concated = torch.cat([query_embedding, hist_pooled_embedding, user_profile_embedding], dim= -1)
 
 
