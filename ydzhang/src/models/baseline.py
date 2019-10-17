@@ -34,7 +34,7 @@ class Model(nn.Module):
 
         for hist in hist_feat_embed_list:
             print(hist.shape)
-        hist_features_embed = pad_sequence(hist_feat_embed_list, batch_first= True)
+        hist_features_embed = pad_sequence(hist_feat_embed_list, batch_first= True) # actually the same as new and fill
 
         user_features_embed = self.user_feature_extract_layer(user_features)
 
