@@ -12,7 +12,7 @@ class EmbeddingMLPLayer(nn.Module):
                  output_dim,
                  ):
         """
-        :param feature_dim_dict: dict,to indicate sparse field and dense field like {'sparse':{'field_1':4,'field_2':3,'field_3':2},'dense':['field_4','field_5']}
+        :param feature_dim_dict: dict,to indicate sparse field and dense field like {'sparse':{'field_1':4,'field_2':3,'field_3':2},'dense':{'field_4': 128,'field_5': 1}}
 
         """
         super(EmbeddingMLPLayer, self).__init__()
@@ -21,7 +21,7 @@ class EmbeddingMLPLayer(nn.Module):
         for sparse_feat, feat_dim in feature_dim_dict['sparse'].items():
             self.embedding_layer_dict[sparse_feat] = nn.Embedding(feat_dim, embedding_size)
         self.embedding_size = embedding_size
-        self.hidden_size = embedding_size * len(feature_dim_dict['sparse']) + len(feature_dim_dict['dense'])
+        self.hidden_size = embedding_size * len(feature_dim_dict['sparse']) + sum(feature_dim_dict['dense'].values())
         self.output_dim = output_dim
         self.linear = nn.Linear(self.hidden_size, output_dim)
 

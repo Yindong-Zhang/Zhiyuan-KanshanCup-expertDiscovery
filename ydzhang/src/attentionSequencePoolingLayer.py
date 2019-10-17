@@ -19,7 +19,7 @@ class SequenceAttentionPoolingLayer(nn.Module):
     def forward(self, query_ad, hist_behavior, hist_behavior_length):
         # query ad            : size -> batch_size * embedding_size
         # user behavior       : size -> batch_size * time_seq_len * embedding_size
-        # user behavior length: size -> batch_size
+        # user behavior length: size -> batch_size * 1
         # output              : size -> batch_size * 1 * embedding_size
 
         attention_logits = self.local_att(query_ad, hist_behavior)

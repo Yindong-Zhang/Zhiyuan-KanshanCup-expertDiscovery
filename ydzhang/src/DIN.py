@@ -12,6 +12,7 @@ class DIN(nn.Module):
                  user_profile_dim,
                  hidden_dim_list = [512, 1],
                  use_batchnorm=True,
+                 user_sigmoid = True,
                  dropout=0):
         super(DIN, self).__init__()
 
@@ -24,7 +25,7 @@ class DIN(nn.Module):
         self.concated_dim = self.query_dim + self.hist_behavior_dim + self.user_profile_dim
         self.output_layer = FullyConnectedLayer(self.concated_dim,
                                                 self.hidden_dims,
-                                                sigmoid= True,
+                                                sigmoid= user_sigmoid,
                                                 batch_norm= use_batchnorm,
                                                 dropout_rate= dropout)
 
