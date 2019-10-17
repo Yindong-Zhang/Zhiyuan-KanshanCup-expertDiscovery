@@ -8,21 +8,24 @@ from torch.nn.utils.rnn import pad_sequence
 import torch.optim as optim
 
 import numpy as np
-dataDir = './test'
-word_embedding = np.random.randn(1024, 128)
 
 # baseline using pooling layer to extract semantic info rather than RCNN
 
 class Model(nn.Module):
-    def __init__(self, query_feat_dict, history_feat_dict, user_feat_dict, query_dim, hist_embed_dim, user_profile_dim, max_hist_length, hidden_dim_list, **kwargs):
+    def __init__(self, query_feat_dict, history_feat_dict, user_feat_dict,
+                 query_embed_dim, hist_embed_dim, user_profile_dim,
+                 hidden_dim_list,
+                 device, **kwargs):
         super(Model, self).__init__(**kwargs)
-        self.max_hist_length = max_hist_length
         self.hist_embed_dim = hist_embed_dim
+        self.user_profile_dim = user_profile_dim
+        self.query_embed_dim = query_embed_dim
+        self.device = device
         self.query_features_extract_layer = EmbeddingMLPLayer(query_feat_dict,
-                                                 embedding_size= 32, output_dim= query_dim)
+                                                              embedding_size= 32, output_dim= query_embed_dim)
         self.hist_features_extract_layer = EmbeddingMLPLayer(history_feat_dict, embedding_size= 8, output_dim= hist_embed_dim)
         self.user_feature_extract_layer= EmbeddingMLPLayer(user_feat_dict, 32, user_profile_dim)
-        self.interaction_layer = DIN(query_dim, hist_embed_dim, user_profile_dim, hidden_dim_list = hidden_dim_list, user_sigmoid= True)
+        self.interaction_layer = DIN(query_embed_dim, hist_embed_dim, user_profile_dim, hidden_dim_list = hidden_dim_list, user_sigmoid= True)
 
     def forward(self, query_features, hist_features_list, hist_length, user_features):
         query_features_embed = self.query_features_extract_layer(query_features)
@@ -34,7 +37,8 @@ class Model(nn.Module):
 
         for hist in hist_feat_embed_list:
             print(hist.shape)
-        hist_features_embed = pad_sequence(hist_feat_embed_list, batch_first= True) # actually the same as new and fill
+        # problem when move to GPU?
+        hist_features_embed = pad_sequence(hist_feat_embed_list, batch_first= True).to(self.device) # actually the same as new and fill
 
         user_features_embed = self.user_feature_extract_layer(user_features)
 
