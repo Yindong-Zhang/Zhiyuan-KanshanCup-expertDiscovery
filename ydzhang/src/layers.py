@@ -7,8 +7,8 @@ class BiLSTMRCNN(nn.Module):
     def __init__(self,
                  embedding_size,
                  hidden_dim,
-                 hidden_layers,
                  word_embeddings,
+                 hidden_layers = 1,
                  embedding_dropout= 0.1,
                  rnn_dropout = 0.1,
                  ):
