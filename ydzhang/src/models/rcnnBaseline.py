@@ -79,6 +79,7 @@ if __name__ == '__main__':
                                      'title_feat': wv_size,
                                      'describe_length': 1,
                                      'title_length': 1,
+                                     'num_answers': 1,
                                      }
                            }
 
@@ -109,6 +110,7 @@ if __name__ == '__main__':
                  'title_feat': torch.randn((batchsize, wv_size)),
                  'describe_length': torch.randint(0, 256, (batchsize, 1)).float(),
                  'title_length': torch.randint(0, 64, (batchsize, 1)).float(),
+                 'num_answers': torch.randint(0, 1024, (batchsize, 1)).float()
                  },
         }
 
@@ -178,6 +180,7 @@ if __name__ == '__main__':
                 'interest_topics': torch.randn((batchsize, 128)),
             }
         }
+
         # history input should be a list of list
         hist_length_list = [np.random.randint(0, max_hist_length + 1) for _ in range(batchsize)]
         hist_length = torch.LongTensor(hist_length_list).reshape((-1, 1))  # shape -> (batchsize, 1)
@@ -188,11 +191,22 @@ if __name__ == '__main__':
 
 
     query_feat_dict, query_titles, query_features, history_feat_dict, hist_length, hist_features_list, user_feat_dict, user_features, target = create_dataset(batchsize, max_hist_length, wv_size)
+    def move_feat_dict_to_gpu(features_dict):
+        for type, type_dict in features_dict.items():
+            for feat, column in type_dict.items():
+                type_dict[feat] = column.cuda()
+            features_dict[type] = type_dict
+        return features_dict
+
+
     # TODO: move to gpu
-    # if use_gpu:
-    #     query_titles = query_titles.cuda()
-    #     query_features = query_features.cuda()
-    #     hist_length = hist_length.cuda()
+    if use_gpu:
+        query_titles = query_titles.cuda()
+        query_features = move_feat_dict_to_gpu(query_features)
+        hist_length = hist_length.cuda()
+        for i in range(len(hist_features_list)):
+            hist_features_list[i] = (hist_features_list[i][0].cuda(), move_feat_dict_to_gpu(hist_features_list[i][1]))
+        user_features = move_feat_dict_to_gpu(user_features)
 
     model = Model(query_feat_dict,
                   history_feat_dict,
@@ -205,7 +219,10 @@ if __name__ == '__main__':
                   title_max_len= title_length,
                   word_embeddings= word_embeddings,
                   hidden_dim_list= [512, 1],
-                  device = 'cpu')
+                  device = 'cuda' if use_gpu else 'cpu')
+
+    if use_gpu:
+        model = model.cuda()
     optimizer = optim.Adam(params= model.parameters(), lr = 1e-3)
 
     optimizer.zero_grad()

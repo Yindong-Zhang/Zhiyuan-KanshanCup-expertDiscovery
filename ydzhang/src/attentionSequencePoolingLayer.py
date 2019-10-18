@@ -28,6 +28,7 @@ class SequenceAttentionPoolingLayer(nn.Module):
 
         # define mask by length
         hist_behavior_length = hist_behavior_length.type(torch.LongTensor)
+        # TODO:
         mask = torch.arange(hist_behavior.size(1))[None, :] < hist_behavior_length[:, None]
 
         # mask
