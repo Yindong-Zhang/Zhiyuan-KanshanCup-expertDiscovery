@@ -207,6 +207,7 @@ if __name__ == '__main__':
         for i in range(len(hist_features_list)):
             hist_features_list[i] = (hist_features_list[i][0].cuda(), move_feat_dict_to_gpu(hist_features_list[i][1]))
         user_features = move_feat_dict_to_gpu(user_features)
+        target = target.cuda()
 
     model = Model(query_feat_dict,
                   history_feat_dict,

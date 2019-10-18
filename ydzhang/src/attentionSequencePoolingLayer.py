@@ -27,9 +27,9 @@ class SequenceAttentionPoolingLayer(nn.Module):
         # print(attention_score.size())
 
         # define mask by length
-        hist_behavior_length = hist_behavior_length.type(torch.LongTensor)
+        hist_behavior_length = hist_behavior_length.long()
         # TODO:
-        mask = torch.arange(hist_behavior.size(1))[None, :] < hist_behavior_length[:, None]
+        mask = torch.arange(hist_behavior.size(1))[None, :].to(hist_behavior.device) < hist_behavior_length[:, None]
 
         # mask
         output = attention_logits.masked_fill(mask, 1e-9)  # batch_size
