@@ -11,14 +11,14 @@ import numpy as np
 
 # baseline using pooling layer to extract semantic info rather than RCNN
 
-class Model(nn.Module):
+class RCNNDIN(nn.Module):
     def __init__(self, query_feat_dict, ans_feat_dict, user_feat_dict,
                  embed_size,
                  ans_embed_dim, user_profile_dim,
                  hidden_dim_list,
                  word_embedding_size, title_embed_size, word_embeddings, title_max_len,
                  device, **kwargs):
-        super(Model, self).__init__(**kwargs)
+        super(RCNNDIN, self).__init__(**kwargs)
         self.embed_size = embed_size
         self.word_embed_size = word_embedding_size
         self.title_embed_size = title_embed_size
@@ -39,15 +39,15 @@ class Model(nn.Module):
         self.user_feature_extract_layer= EmbeddingMLPLayer(user_feat_dict, embed_size, mlp_hidden_list= [user_profile_dim, ])
         self.interaction_layer = DIN(self.query_embed_dim, self.hist_embed_dim, user_profile_dim, hidden_dim_list = hidden_dim_list, use_sigmoid= True)
 
-    def forward(self, query_titles, query_features, hist_features_list, hist_length, user_features):
+    def forward(self, query_titles, query_features, hist_feat_list, hist_length, user_features):
         query_title_embed = self.title_feature_extract_layer(query_titles)
         query_feat_part = self.query_features_extract_layer(query_features)
         query_feat_embed = torch.cat([query_title_embed, query_feat_part], dim= -1)
-        batchsize = len(hist_features_list)
+        batchsize = len(hist_feat_list)
 
         # problem when move to GPU?
         hist_feat_embed = torch.zeros((batchsize, self.title_max_length, self.hist_embed_dim)).to(self.device)
-        for i ,(length, (question_titles, answer_features)) in enumerate(zip(hist_length, hist_features_list)):
+        for i ,(length, (question_titles, answer_features)) in enumerate(zip(hist_length, hist_feat_list)):
             if length > 0:
                 hist_feat_embed[i, :length] = torch.cat([self.title_feature_extract_layer(question_titles), self.hist_features_extract_layer(answer_features)],
                                                   dim= -1)
@@ -209,18 +209,18 @@ if __name__ == '__main__':
         user_features = move_feat_dict_to_gpu(user_features)
         target = target.cuda()
 
-    model = Model(query_feat_dict,
-                  history_feat_dict,
-                  user_feat_dict,
-                  32,
-                  hist_embed_dim,
-                  user_profile_dim,
-                  word_embedding_size= wv_size,
-                  title_embed_size= 256,
-                  title_max_len= title_length,
-                  word_embeddings= word_embeddings,
-                  hidden_dim_list= [512, 1],
-                  device = 'cuda' if use_gpu else 'cpu')
+    model = RCNNDIN(query_feat_dict,
+                    history_feat_dict,
+                    user_feat_dict,
+                    32,
+                    hist_embed_dim,
+                    user_profile_dim,
+                    word_embedding_size= wv_size,
+                    title_embed_size= 256,
+                    title_max_len= title_length,
+                    word_embeddings= word_embeddings,
+                    hidden_dim_list= [512, 1],
+                    device = 'cuda' if use_gpu else 'cpu')
 
     if use_gpu:
         model = model.cuda()
