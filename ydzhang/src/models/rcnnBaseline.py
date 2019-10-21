@@ -39,15 +39,15 @@ class RCNNDIN(nn.Module):
         self.user_feature_extract_layer= EmbeddingMLPLayer(user_feat_dict, embed_size, mlp_hidden_list= [user_profile_dim, ])
         self.interaction_layer = DIN(self.query_embed_dim, self.hist_embed_dim, user_profile_dim, hidden_dim_list = hidden_dim_list, use_sigmoid= True)
 
-    def forward(self, query_titles, query_features, hist_feat_list, hist_length, user_features):
+    def forward(self, query_titles, query_features, hist_features_list, hist_length, user_features):
         query_title_embed = self.title_feature_extract_layer(query_titles)
         query_feat_part = self.query_features_extract_layer(query_features)
         query_feat_embed = torch.cat([query_title_embed, query_feat_part], dim= -1)
-        batchsize = len(hist_feat_list)
+        batchsize = len(hist_features_list)
 
         # problem when move to GPU?
         hist_feat_embed = torch.zeros((batchsize, self.title_max_length, self.hist_embed_dim)).to(self.device)
-        for i ,(length, (question_titles, answer_features)) in enumerate(zip(hist_length, hist_feat_list)):
+        for i ,(length, (question_titles, answer_features)) in enumerate(zip(hist_length, hist_features_list)):
             if length > 0:
                 hist_feat_embed[i, :length] = torch.cat([self.title_feature_extract_layer(question_titles), self.hist_features_extract_layer(answer_features)],
                                                   dim= -1)
@@ -76,7 +76,6 @@ if __name__ == '__main__':
     def create_dataset(batchsize, max_hist_length, wv_size, ):
         query_feat_dict = {'sparse': {'has_describe': 2},
                            'dense': {'topics_feat': wv_size,
-                                     'title_feat': wv_size,
                                      'describe_length': 1,
                                      'title_length': 1,
                                      'num_answers': 1,
@@ -107,7 +106,6 @@ if __name__ == '__main__':
         },
             'dense':
                 {'topic_feat': torch.randn((batchsize, wv_size)),
-                 'title_feat': torch.randn((batchsize, wv_size)),
                  'describe_length': torch.randint(0, 256, (batchsize, 1)).float(),
                  'title_length': torch.randint(0, 64, (batchsize, 1)).float(),
                  'num_answers': torch.randint(0, 1024, (batchsize, 1)).float()
@@ -156,7 +154,6 @@ if __name__ == '__main__':
             'dense': {
                 'salt_value': 1,
                 'follow_topics': wv_size,
-                'interest_topics': wv_size,
             }
         }
         user_features = {
