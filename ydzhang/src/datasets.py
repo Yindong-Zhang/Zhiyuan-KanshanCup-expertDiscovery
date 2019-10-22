@@ -21,54 +21,70 @@ def create_feat_dict(feat_dim_dict, inds, feat_df, array_dict):
         elif feat_dim > 1:
             dense_feat_inds = feat_df.loc[inds, feat_name]
             dense_feat_dict[feat_name] = torch.FloatTensor(array_dict[feat_name][dense_feat_inds, :])
+        else:
+            raise Exception("illegal dimension")
     return {'dense': dense_feat_dict, 'sparse': sparse_feat_dict}
 
 
 class Dataset():
     def __init__(self, dataDir, batchsize, question_feat_dict, user_feat_dict, answer_feat_dict):
         self.dataDir = dataDir
-        self.invite_df = pd.read_csv(os.path.join(self.dataDir, 'invite_info.csv'),
-                                names= ['question_id', 'user_id', 'create_day', 'isAnswer'])
-        self.user_df = pd.read_csv(os.path.join(self.dataDir, 'user_info.csv'),
-                              names= ['user_id', 'gender', 'visit_freq', 'binary_A',
-                                     'binary_B', 'binary_C', 'binary_D', 'binary_E',
-                                     'category_A' 'category_B', 'category_C',
-                                     'category_D', 'category_E', 'salt', 'follow_topics_mp', 'interest_topics'],
-                              index_col= 'user_id')
+        self.invite_df = pd.read_csv(os.path.join(self.dataDir, 'invite_info_1021.csv'),
+                                usecols= ['question_id', 'user_id', 'create_day', 'is_answer'],
+                                     sep= '\t',
+                                     # nrows= 10000,
+                                     )
+        self.user_df = pd.read_csv(os.path.join(self.dataDir, 'member_info_1021.csv'),
+                              # usecols= ['user_id', 'gender', 'visit_freq', 'binary_A',
+                              #        'binary_B', 'binary_C', 'binary_D', 'binary_E',
+                              #        'category_A',
+                              #        'category_B',
+                              #        'category_C',
+                              #        'category_D', 'category_E', 'salt_value', 'follow_topics_mp', 'interest_topics'],
+                              index_col= 'user_id',
+                                   sep= '\t',
+                                   # nrows= 10000,
+                                   )
         user_follow_topics_mp = np.load(os.path.join(self.dataDir, 'user_follow_topics_mp.npy'))
         self.user_array_dict = {'follow_topics_mp': user_follow_topics_mp}
-        self.quest_df = pd.read_csv(os.path.join(self.dataDir, 'question_info.csv'),
-                                    names = ['question_id', 'title_SW', 'title_W', 'question_topics_mp', 'create_day'],
-                                    index_col= 'question_id')
+        self.quest_df = pd.read_csv(os.path.join(self.dataDir, 'question_info_1021.csv'),
+                                    # usecols= ['question_id', 'title_SW', 'title_W', 'question_topics_mp', 'title_W_ind', 'create_day',
+                                    #           'has_describe', 'describe_length'],
+                                    index_col= 'question_id',
+                                    sep= '\t',
+                                    # nrows= 10000
+                                    )
         self.quest_array_dict = {'topics_mp': np.load(os.path.join(self.dataDir, 'question_topics_mp.npy'))}
-        # TODO: pad title sequence to fix length sequence
-        # expect quest titles to be a pandas dataframe ? or dict of list of words?
-        self.quest_title_sr = self.quest_df['title_W']
-        self.answer_df = pd.read_csv(os.path.join(self.dataDir, 'answer_info.csv'),
-                                names = ['answer_id', 'question_id', 'user_id', 'create_day',
-                                         'ans_SW', 'ans_W', 'is_good', 'has_picture', 'has_video',
-                                         'word_count', 'num_zan', 'num_cancel', 'num_comment', 'num_collect',
-                                         'num_thanks', 'num_report', 'num_useless', 'num_oppos', 'question_topics_mp'],
-                                index_col= 'answer_id')
+        self.quest_title_array = np.load(os.path.join(self.dataDir, 'question_title_W.npy'))
+        self.answer_df = pd.read_csv(os.path.join(self.dataDir, 'answer_info_1021.csv'),
+                                # usecols = ['answer_id', 'question_id', 'user_id', 'create_day',
+                                #          'answer_SW', 'answer_W', 'is_good', 'has_picture', 'has_video',
+                                #          'word_count', 'num_zan', 'num_cancel_zan', 'num_comment', 'num_collect',
+                                #          'num_thanks', 'num_report', 'num_useless', 'num_oppose', 'question_topics_mp'],
+                                index_col= ['user_id', 'answer_id'],
+                                     sep= '\t',
+                                     # nrows= 10000,
+                                     )
         user_ids = self.invite_df['user_id'].unique()
-        self.history_dict = {user_id: self.answer_df.loc[self.answer_df['user_id'] == user_id, ['question_id', 'answer_id', 'create_time']] for user_id in user_ids}
+        #TODO: 利用user id 建立多重索引
+        self.history_dict = {user_id: self.answer_df.loc[self.answer_df['user_id'] == user_id, ['question_id', 'answer_id', 'create_day']] for user_id in user_ids}
         self.n_samples = len(self.invite_df)
         self.batchsize = batchsize
-
         self.quest_feat_dict = question_feat_dict
         self.user_feat_dict = user_feat_dict
         self.answer_feat_dict = answer_feat_dict
 
     def __iter__(self):
-        inds_list = random.shuffle(range(self.n_samples))
+        inds_list = list(range(self.n_samples))
+        random.shuffle(inds_list)
         n_batches = ceil(self.n_samples / self.batchsize)
         for i in range(n_batches):
             batch_inds = inds_list[i * self.batchsize : min((i + 1 ) * self.batchsize, self.n_samples)]
             batch_invite_df= self.invite_df.loc[batch_inds, :]
-            quest_ids, user_ids, invite_times, isAnswers = batch_invite_df['question_id'], batch_invite_df['user_id'], batch_invite_df['create_time'], batch_invite_df['isAnswer']
-            quest_feats = create_feat_dict(self.quest_feat_dict, quest_ids, self.quest_df)
+            quest_ids, user_ids, invite_times, is_answer = batch_invite_df['question_id'], batch_invite_df['user_id'], batch_invite_df['create_day'], batch_invite_df['is_answer']
+            quest_feats = create_feat_dict(self.quest_feat_dict, quest_ids, self.quest_df, self.quest_array_dict)
 
-            quest_titles = torch.LongTensor(self.quest_title_sr.loc[quest_ids])
+            quest_titles = torch.LongTensor(self.quest_title_array(self.quest_df.loc[quest_ids, 'title_W_ind']))
 
             user_feats = create_feat_dict(self.user_feat_dict, user_ids, self.user_df, self.user_array_dict)
 
@@ -80,8 +96,8 @@ class Dataset():
                 hist_len.append(len(hist_df))
                 hist_qids = hist_df['question_ids']
                 hist_aids = hist_df['answer_ids']
-                hist_quest_feats = torch.LongTensor(self.quest_title_sr.loc[hist_qids])
-                hist_ans_feats = create_feat_dict(self.answer_feat_dict, hist_aids, self.answer_df)
+                hist_quest_feats = torch.LongTensor(self.quest_title_array(self.quest_df.loc[hist_qids, 'title_W_ind']))
+                hist_ans_feats = create_feat_dict(self.answer_feat_dict, hist_aids, self.answer_df, self.quest_array_dict)
                 hist_feat_list.append((hist_quest_feats, hist_ans_feats))
 
             hist_len = torch.LongTensor(hist_len).reshape(-1, 1)
@@ -94,8 +110,8 @@ if __name__ == '__main__':
     query_feat_dict = {'sparse': {'has_describe': 2},
                        'dense': {'topics_mp': wv_size,
                                  'describe_length': 1,
-                                 'title_length': 1,
-                                 'num_answers': 1,
+                                 # 'title_length': 1,
+                                 # 'num_answers': 1,
                                  }
                        }
     history_feat_dict = {'sparse': {
