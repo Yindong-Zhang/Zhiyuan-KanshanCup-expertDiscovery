@@ -67,7 +67,8 @@ class Dataset():
                                      )
         user_ids = self.invite_df['user_id'].unique()
         #TODO: 利用user id 建立多重索引
-        self.history_dict = {user_id: self.answer_df.loc[self.answer_df['user_id'] == user_id, ['question_id', 'answer_id', 'create_day']] for user_id in user_ids}
+        # self.history_dict = {user_id: self.answer_df.loc[self.answer_df['user_id'] == user_id, ['question_id', 'answer_id', 'create_day']] for user_id in user_ids}
+        self.history_dict = self.answer_df[['question_id', 'create_day']]
         self.n_samples = len(self.invite_df)
         self.batchsize = batchsize
         self.quest_feat_dict = question_feat_dict
@@ -91,8 +92,8 @@ class Dataset():
             hist_feat_list = []
             hist_len = []
             for user_id, invite_times in zip(user_ids, invite_times):
-                full_history = self.history_dict[user_id]
-                hist_df = full_history.loc[hist_df['create_time'] < invite_times]
+                full_history = self.history_dict.loc[user_id]
+                hist_df = full_history.loc[hist_df['create_day'] < invite_times]
                 hist_len.append(len(hist_df))
                 hist_qids = hist_df['question_ids']
                 hist_aids = hist_df['answer_ids']
@@ -108,7 +109,7 @@ class Dataset():
 if __name__ == '__main__':
     wv_size = 64
     query_feat_dict = {'sparse': {'has_describe': 2},
-                       'dense': {'topics_mp': wv_size,
+                       'dense': {'question_topics_mp': wv_size,
                                  'describe_length': 1,
                                  # 'title_length': 1,
                                  # 'num_answers': 1,
@@ -120,7 +121,7 @@ if __name__ == '__main__':
         'has_picture': 2,
         'has_video': 2,
     },
-        'dense': {'topic_mp': wv_size,
+        'dense': {'question_topic_mp': wv_size,
                   'word_count': 1,
                   'num_zan': 1,
                   'num_cancel_zan': 1,
