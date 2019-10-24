@@ -7,7 +7,7 @@ from math import ceil
 import torch
 
 class Dataset():
-    def __init__(self, dataDir, batchsize, question_feat_dict, user_feat_dict, answer_feat_dict):
+    def __init__(self, dataDir, batchsize, question_feat_dict, user_feat_dict, answer_feat_dict, max_hist_len):
         self.dataDir = dataDir
         self.invite_df = pd.read_csv(os.path.join(self.dataDir, 'invite_info_1021.csv'),
                                 usecols= ['question_id', 'user_id', 'create_day', 'is_answer'],
@@ -51,6 +51,7 @@ class Dataset():
         #                                 usecols=['answer_id', 'question_id', 'user_id', 'create_day'],
         #                                 index_col=['user_id', 'answer_id'],
         #                                 sep= '\t')
+        self.max_hist_len = max_hist_len
         self.user_has_history_set = set(self.answer_df['user_id'].unique())
         self.history_dict= self.answer_df[['question_id', 'user_id', 'create_day']].set_index(['user_id', self.answer_df.index])
         self.n_samples = len(self.invite_df)
@@ -69,8 +70,6 @@ class Dataset():
             quest_ids, user_ids, invite_times, is_answer = batch_invite_df['question_id'], batch_invite_df['user_id'], batch_invite_df['create_day'], batch_invite_df['is_answer']
             quest_feats = create_feat_dict(self.quest_feat_dict, quest_ids, self.quest_df, self.quest_array_dict)
 
-            quest_titles = torch.LongTensor(self.quest_title_array[self.quest_df.loc[quest_ids, 'title_W_ind']])
-
             user_feats = create_feat_dict(self.user_feat_dict, user_ids, self.user_df, self.user_array_dict)
 
             hist_feat_list = []
@@ -80,13 +79,13 @@ class Dataset():
                 if user_id in self.user_has_history_set:
                     full_history = self.history_dict.loc[user_id]
                     hist_df = full_history.loc[full_history['create_day'] <= invite_time]
+                    hist_df = hist_df.iloc[-self.max_hist_len:,]
                     hist_len.append(len(hist_df))
                     if len(hist_df) > 0:
                         hist_qids = hist_df['question_id']
                         hist_aids = hist_df.index # answer_id
-                        hist_quest_feats = torch.LongTensor(self.quest_title_array[self.quest_df.loc[hist_qids, 'title_W_ind']])
                         hist_ans_feats = create_feat_dict(self.answer_feat_dict, hist_aids, self.answer_df, self.quest_array_dict)
-                        hist_feat_list.append((hist_quest_feats, hist_ans_feats))
+                        hist_feat_list.append(hist_ans_feats)
                     else:
                         hist_feat_list.append((None, None))
                 else:
@@ -95,4 +94,64 @@ class Dataset():
 
             hist_len = torch.LongTensor(hist_len).reshape(-1, 1)
 
-            yield quest_titles, quest_feats, hist_feat_list, hist_len, user_feats,
+            yield quest_feats, hist_feat_list, hist_len, user_feats,
+
+
+
+if __name__ == '__main__':
+    wv_size = 64
+    max_hist_len = 16
+    query_feat_dict = {'sparse': {'has_describe': 2},
+                       'dense': {'question_topics_mp': wv_size,
+                                 'describe_length': 1,
+                                 # 'title_length': 1,
+                                 # 'num_answers': 1,
+                                 }
+                       }
+    history_feat_dict = {'sparse': {
+        'is_good': 2,
+        # 'is_recommend': 2,
+        'has_picture': 2,
+        'has_video': 2,
+    },
+        'dense': {'question_topics_mp': wv_size,
+                  'word_count': 1,
+                  'num_zan': 1,
+                  'num_cancel_zan': 1,
+                  'num_comment': 1,
+                  'num_collect': 1,
+                  'num_thanks': 1,
+                  'num_report': 1,
+                  'num_useless': 1,
+                  'num_oppose': 1}
+    }
+    user_feat_dict = {'sparse': {
+        'gender': 3,
+        'visit_freq': 5,
+        'binary_A': 2,
+        'binary_B': 2,
+        'binary_C': 2,
+        'binary_D': 2,
+        'binary_E': 2,
+        'category_A': 100,
+        'category_B': 100,
+        'category_C': 100,
+        'category_D': 100,
+        'category_E': 100,
+    },
+        'dense': {
+            'salt_value': 1,
+            'follow_topics_mp': wv_size,
+        }
+    }
+    dataset = Dataset('../../data',
+                      batchsize= 32,
+                      question_feat_dict= query_feat_dict,
+                      user_feat_dict= user_feat_dict,
+                      answer_feat_dict= history_feat_dict,
+                      max_hist_len = max_hist_len,
+                      )
+    for i, batch in enumerate(dataset):
+        print(batch)
+        if i > 20:
+            break;

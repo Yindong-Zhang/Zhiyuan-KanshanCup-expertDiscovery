@@ -14,23 +14,24 @@ import numpy as np
 class Model(nn.Module):
     def __init__(self, query_feat_dict, history_feat_dict, user_feat_dict,
                  query_embed_dim, hist_embed_dim, user_profile_dim,
-                 hist_max_len,
+                 max_hist_len, embed_size,
                  hidden_dim_list,
                  device, **kwargs):
         super(Model, self).__init__(**kwargs)
         self.hist_embed_dim = hist_embed_dim
         self.user_profile_dim = user_profile_dim
         self.query_embed_dim = query_embed_dim
-        self.max_hist_len = hist_max_len
+        self.max_hist_len = max_hist_len
+        self.embed_size = embed_size
         self.device = device
         self.query_features_extract_layer = EmbeddingMLPLayer(query_feat_dict,
-                                                              embedding_size= 32, output_dim= query_embed_dim)
-        self.hist_features_extract_layer = EmbeddingMLPLayer(history_feat_dict, embedding_size= 8, output_dim= hist_embed_dim)
-        self.user_feature_extract_layer= EmbeddingMLPLayer(user_feat_dict, 32, user_profile_dim)
-        self.interaction_layer = DIN(query_embed_dim, hist_embed_dim, user_profile_dim, hidden_dim_list = hidden_dim_list, user_sigmoid= True)
+                                                              embedding_size= self.embed_size, mlp_hidden_list= [self.query_embed_dim, ])
+        self.hist_features_extract_layer = EmbeddingMLPLayer(history_feat_dict, embedding_size= self.embed_size, mlp_hidden_list= [self.hist_embed_dim, ])
+        self.user_feature_extract_layer= EmbeddingMLPLayer(user_feat_dict, embedding_size= self.embed_size, mlp_hidden_list= [self.user_profile_dim, ])
+        self.interaction_layer = DIN(query_embed_dim, hist_embed_dim, user_profile_dim, hidden_dim_list = hidden_dim_list, use_sigmoid= True)
 
     def forward(self, query_features, hist_features_list, hist_length, user_features):
-        query_features_embed = self.query_features_extract_layer(query_features)
+        query_feat_embed = self.query_features_extract_layer(query_features)
         batchsize = len(hist_features_list)
 
         # hist_feat_embed_list = []
@@ -42,21 +43,17 @@ class Model(nn.Module):
         for i ,(length,  answer_features) in enumerate(zip(hist_length, hist_features_list)):
             if length > 0:
                 hist_feat_embed[i, :length] = self.hist_features_extract_layer(answer_features)
+        print(hist_feat_embed.shape)
 
-        for hist in hist_feat_embed_list:
-            print(hist.shape)
-        # problem when move to GPU?
-        hist_features_embed = pad_sequence(hist_feat_embed_list, batch_first= True).to(self.device) # actually the same as new and fill
+        user_feat_embed = self.user_feature_extract_layer(user_features)
 
-        user_features_embed = self.user_feature_extract_layer(user_features)
-
-        out = self.interaction_layer(query_features_embed, hist_features_embed, hist_length, user_features_embed)
+        out = self.interaction_layer(query_feat_embed, hist_feat_embed, hist_length, user_feat_embed)
         return out
 
 if __name__ == '__main__':
     wv_size = 128
     batchsize = 32
-    max_hist_length = 10
+    max_hist_length = 20
     hist_embed_dim = 128
     query_embed_dim = 128
     user_profile_dim = 512
@@ -171,7 +168,12 @@ if __name__ == '__main__':
 
 
     query_feat_dict, query_features, history_feat_dict, hist_length, hist_features_list, user_feat_dict, user_features, target = create_dataset(batchsize, max_hist_length, wv_size)
-    model = Model(query_feat_dict, history_feat_dict, user_feat_dict, query_embed_dim, hist_embed_dim, user_profile_dim, max_hist_length = max_hist_length, hidden_dim_list= [512, 1])
+    model = Model(query_feat_dict, history_feat_dict, user_feat_dict,
+                  query_embed_dim, hist_embed_dim, user_profile_dim,
+                  embed_size= 32,
+                  max_hist_len = max_hist_length,
+                  hidden_dim_list= [512, 1],
+                  device= 'cpu')
     optimizer = optim.Adam(params= model.parameters(), lr = 1e-3)
 
     optimizer.zero_grad()
