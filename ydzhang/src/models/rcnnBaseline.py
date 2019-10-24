@@ -16,13 +16,13 @@ class RCNNDIN(nn.Module):
                  embed_size,
                  ans_embed_dim, user_profile_dim,
                  hidden_dim_list,
-                 word_embedding_size, title_embed_size, word_embeddings, title_max_len,
+                 word_embedding_size, title_embed_size, word_embeddings, max_hist_len,
                  device, **kwargs):
         super(RCNNDIN, self).__init__(**kwargs)
         self.embed_size = embed_size
         self.word_embed_size = word_embedding_size
         self.title_embed_size = title_embed_size
-        self.title_max_length = title_max_len
+        self.max_hist_len = max_hist_len
         self.ans_embed_dim = ans_embed_dim
         self.user_profile_dim = user_profile_dim
         self.query_embed_dim = embed_size * len(query_feat_dict['sparse']) + sum(query_feat_dict['dense'].values()) + 2 * self.title_embed_size
@@ -46,7 +46,7 @@ class RCNNDIN(nn.Module):
         batchsize = len(hist_features_list)
 
         # problem when move to GPU?
-        hist_feat_embed = torch.zeros((batchsize, self.title_max_length, self.hist_embed_dim)).to(self.device)
+        hist_feat_embed = torch.zeros((batchsize, self.max_hist_len, self.hist_embed_dim)).to(self.device)
         for i ,(length, (question_titles, answer_features)) in enumerate(zip(hist_length, hist_features_list)):
             if length > 0:
                 hist_feat_embed[i, :length] = torch.cat([self.title_feature_extract_layer(question_titles), self.hist_features_extract_layer(answer_features)],
@@ -214,7 +214,7 @@ if __name__ == '__main__':
                     user_profile_dim,
                     word_embedding_size= wv_size,
                     title_embed_size= 256,
-                    title_max_len= title_length,
+                    max_hist_len= max_hist_length,
                     word_embeddings= word_embeddings,
                     hidden_dim_list= [512, 1],
                     device = 'cuda' if use_gpu else 'cpu')

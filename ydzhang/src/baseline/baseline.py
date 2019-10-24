@@ -14,12 +14,14 @@ import numpy as np
 class Model(nn.Module):
     def __init__(self, query_feat_dict, history_feat_dict, user_feat_dict,
                  query_embed_dim, hist_embed_dim, user_profile_dim,
+                 hist_max_len,
                  hidden_dim_list,
                  device, **kwargs):
         super(Model, self).__init__(**kwargs)
         self.hist_embed_dim = hist_embed_dim
         self.user_profile_dim = user_profile_dim
         self.query_embed_dim = query_embed_dim
+        self.max_hist_len = hist_max_len
         self.device = device
         self.query_features_extract_layer = EmbeddingMLPLayer(query_feat_dict,
                                                               embedding_size= 32, output_dim= query_embed_dim)
@@ -31,9 +33,15 @@ class Model(nn.Module):
         query_features_embed = self.query_features_extract_layer(query_features)
         batchsize = len(hist_features_list)
 
-        hist_feat_embed_list = []
-        for i in range(batchsize):
-            hist_feat_embed_list.append(self.hist_features_extract_layer(hist_features_list[i]))
+        # hist_feat_embed_list = []
+        # for i in range(batchsize):
+        #     hist_feat_embed_list.append(self.hist_features_extract_layer(hist_features_list[i]))
+
+        # TODO: debug
+        hist_feat_embed = torch.zeros((batchsize, self.max_hist_len, self.hist_embed_dim)).to(self.device)
+        for i ,(length,  answer_features) in enumerate(zip(hist_length, hist_features_list)):
+            if length > 0:
+                hist_feat_embed[i, :length] = self.hist_features_extract_layer(answer_features)
 
         for hist in hist_feat_embed_list:
             print(hist.shape)
