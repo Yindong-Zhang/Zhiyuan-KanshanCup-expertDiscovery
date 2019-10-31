@@ -17,7 +17,7 @@ def create_feat_dict(feat_dim_dict, inds, feat_df, array_dict):
     dense_feat_dict = {}
     for feat_name, feat_dim in feat_dim_dict['dense'].items():
         if feat_dim == 1:
-            dense_feat_dict[feat_name] = torch.FloatTensor(feat_df.loc[inds, feat_name])
+            dense_feat_dict[feat_name] = torch.FloatTensor(feat_df.loc[inds, feat_name]).reshape(-1, 1)
         elif feat_dim > 1:
             dense_feat_inds = feat_df.loc[inds, feat_name]
             dense_feat_dict[feat_name] = torch.FloatTensor(array_dict[feat_name][dense_feat_inds, :])
@@ -78,11 +78,13 @@ class Dataset():
         self.quest_feat_dict = question_feat_dict
         self.user_feat_dict = user_feat_dict
         self.answer_feat_dict = answer_feat_dict
+        self.num_batches = ceil(self.n_samples / self.batchsize)
+
 
     def __iter__(self):
         inds_list = list(range(self.n_samples))
         random.shuffle(inds_list)
-        n_batches = ceil(self.n_samples / self.batchsize)
+        n_batches = self.num_batches
         for i in range(n_batches):
             batch_inds = inds_list[i * self.batchsize : min((i + 1 ) * self.batchsize, self.n_samples)]
             batch_invite_df= self.invite_df.loc[batch_inds, :]
@@ -116,6 +118,9 @@ class Dataset():
             hist_len = torch.LongTensor(hist_len).reshape(-1, 1)
 
             yield quest_titles, quest_feats, hist_feat_list, hist_len, user_feats,
+
+    def __len__(self):
+        return self.num_batches
 
 
 if __name__ == '__main__':

@@ -38,7 +38,6 @@ class Model(nn.Module):
         # for i in range(batchsize):
         #     hist_feat_embed_list.append(self.hist_features_extract_layer(hist_features_list[i]))
 
-        # TODO: debug
         hist_feat_embed = torch.zeros((batchsize, self.max_hist_len, self.hist_embed_dim)).to(self.device)
         for i ,(length,  answer_features) in enumerate(zip(hist_length, hist_features_list)):
             if length > 0:
