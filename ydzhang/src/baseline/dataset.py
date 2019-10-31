@@ -40,7 +40,6 @@ class Dataset():
         self.user_feat_dict = user_feat_dict
         self.answer_feat_dict = answer_feat_dict
 
-        # TODO: debug
         self.day_range= day_range
         self.inds_list = np.arange(len(self.invite_df))[np.logical_and(self.invite_df['create_day'] >= self.day_range[0], self.invite_df['create_day'] < self.day_range[1])].tolist()
         self.n_samples = len(self.inds_list)
@@ -122,10 +121,11 @@ def create_train_val_dataset(dataDir,
     quest_array_dict = {'question_topics_mp': np.load(os.path.join(dataDir, 'question_topics_mp.npy'))}
     # self.quest_title_array = np.load(os.path.join(self.dataDir, 'question_title_W.npy'))
     answer_df = pd.read_csv(os.path.join(dataDir, 'answer_info_1021.csv'),
-                                 # usecols = ['answer_id', 'question_id', 'user_id', 'create_day',
-                                 #          'answer_SW', 'answer_W', 'is_good', 'has_picture', 'has_video',
-                                 #          'word_count', 'num_zan', 'num_cancel_zan', 'num_comment', 'num_collect',
-                                 #          'num_thanks', 'num_report', 'num_useless', 'num_oppose', 'question_topics_mp'],
+                                 usecols = ['answer_id', 'question_id', 'user_id', 'create_day',
+                                          #'answer_SW', 'answer_W',
+                                            'is_good', 'has_picture', 'has_video',
+                                          'word_count', 'num_zan', 'num_cancel_zan', 'num_comment', 'num_collect',
+                                          'num_thanks', 'num_report', 'num_useless', 'num_oppose', 'question_topics_mp'],
                                  index_col=['answer_id'],
                                  sep='\t',
                                  # nrows= 10000,

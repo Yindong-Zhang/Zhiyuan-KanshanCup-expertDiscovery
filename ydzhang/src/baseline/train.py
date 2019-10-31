@@ -1,7 +1,9 @@
 from src.baseline.dataset import create_train_val_dataset
 from src.baseline.baseline import Model
-from sklearn.metrics import auc
-from src.config import DAYFIRST
+from sklearn.metrics import roc_auc_score
+import os
+from src.config import DAYFIRST, PROJECTPATH
+import torch
 from torch import optim, nn
 import argparse
 
@@ -9,6 +11,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--epoches', type= int, default= 10000, help= 'training epoches')
 parser.add_argument('--print_every', type= int, default = 32, help= 'print intervals.')
+parser.add_argument('--patience', type= int, default= 4, help= 'patience epoche for early stopping')
 args = parser.parse_args()
 
 wv_size = 64
@@ -59,14 +62,8 @@ user_feat_dict = {'sparse': {
         'follow_topics_mp': wv_size,
     }
 }
-# dataset = Dataset('../../data',
-#                   batchsize= 32,
-#                   question_feat_dict= query_feat_dict,
-#                   user_feat_dict= user_feat_dict,
-#                   answer_feat_dict= history_feat_dict,
-#                   max_hist_len = max_hist_len,
-#                   )
-
+configStr= 'test'
+chkpt_path =  os.path.join(PROJECTPATH, 'chkpt', configStr)
 train_dataset, val_dataset = create_train_val_dataset('../../data',
                   batchsize= 32,
                   question_feat_dict= query_feat_dict,
@@ -83,6 +80,7 @@ model = Model(query_feat_dict, history_feat_dict, user_feat_dict,
               max_hist_len=max_hist_len,
               hidden_dim_list=[512, 1],
               device='cpu')
+
 optimizer = optim.Adam(params=model.parameters(), lr=1e-3)
 
 def loop_dataset(model, dataset, optimizer= None):
@@ -96,7 +94,7 @@ def loop_dataset(model, dataset, optimizer= None):
         optimizer.zero_grad()
         predict = model(quest_feats, hist_feat_list, hist_len, user_feats)
         loss = nn.BCELoss()(predict, target)
-        auc_score = auc(predict, target)
+        auc_score = roc_auc_score(target, predict.detach())
 
         if optimizer is not None:
             loss.backward()
@@ -106,13 +104,15 @@ def loop_dataset(model, dataset, optimizer= None):
         mean_auc = (i * mean_auc + auc_score) / (i + 1)
 
         if i % args.print_every == 0:
-            print("%d / %d: loss %.4f auc %。4f" %(i, num_batches, mean_loss, mean_auc))
+            print("%d / %d: loss %.4f auc %.4f" %(i, num_batches, mean_loss, mean_auc))
 
         if i > 20:
             break
 
     return mean_loss, mean_auc
 
+best_pfms = 0
+count = 0
 for epoch in range(args.epoches):
     print("training epoch %d ..." %(epoch, ))
     train_loss, train_auc = loop_dataset(model, train_dataset, optimizer)
@@ -125,3 +125,13 @@ for epoch in range(args.epoches):
     if epoch > 2:
         break
 
+    if val_auc > best_pfms:
+        best_pfms = val_auc
+        torch.save(model, chkpt_path)
+        count = 0
+    else:
+        count += 1
+        if count > args.patience:
+            print("early stopping at epoch %d: performance %.4f." %(epoch, best_pfms))
+
+model = torch.load(chkpt_path)
