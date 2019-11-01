@@ -4,7 +4,6 @@ import torch.functional as F
 from src.attentionSequencePoolingLayer import SequenceAttentionPoolingLayer
 from src.layers import FullyConnectedLayer
 
-# TODO:
 class DIN(nn.Module):
     def __init__(self,
                  query_dim,
@@ -33,7 +32,7 @@ class DIN(nn.Module):
 
         # add wide part of model ?
         hist_pooled_embedding = self.sequenceAttentionPoolingLayer(query_embedding, hist_embedding, hist_length)
-        print('number of zero length history %d' %(torch.sum(hist_length == 0), ))
+        # print('number of zero length history %d' %(torch.sum(hist_length == 0), ))
         hist_pooled_embedding = torch.where(hist_length == 0, hist_pooled_embedding, self.no_hist_embedding) # amazing shape broadcast
         embed_concated = torch.cat([query_embedding, hist_pooled_embedding, user_profile_embedding], dim= -1)
 

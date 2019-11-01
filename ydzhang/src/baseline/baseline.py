@@ -42,7 +42,7 @@ class Model(nn.Module):
         for i ,(length,  answer_features) in enumerate(zip(hist_length, hist_features_list)):
             if length > 0:
                 hist_feat_embed[i, :length] = self.hist_features_extract_layer(answer_features)
-        print(hist_feat_embed.shape)
+        #print(hist_feat_embed.shape)
 
         user_feat_embed = self.user_feature_extract_layer(user_features)
 

@@ -78,7 +78,7 @@ class Dataset():
 
             hist_len = torch.LongTensor(hist_len).reshape(-1, 1)
 
-            target = torch.FloatTensor(is_answer.values)
+            target = torch.FloatTensor(is_answer.values).reshape(-1, 1)
             yield quest_feats, hist_feat_list, hist_len, user_feats, target
 
     def __len__(self):

@@ -13,13 +13,14 @@ def create_feat_dict(feat_dim_dict, inds, feat_df, array_dict):
     :param array_dict: dictionary of array for vector features
     :return: a feature column dictionary replace dimension with feature column
     """
-    sparse_feat_dict = {feat_name: torch.LongTensor(feat_df.loc[inds, feat_name]) for feat_name in feat_dim_dict['sparse']}
+    feat_df = feat_df.loc[inds, :]
+    sparse_feat_dict = {feat_name: torch.LongTensor(feat_df[feat_name]) for feat_name in feat_dim_dict['sparse']}
     dense_feat_dict = {}
     for feat_name, feat_dim in feat_dim_dict['dense'].items():
         if feat_dim == 1:
-            dense_feat_dict[feat_name] = torch.FloatTensor(feat_df.loc[inds, feat_name]).reshape(-1, 1)
+            dense_feat_dict[feat_name] = torch.FloatTensor(feat_df[feat_name]).reshape(-1, 1)
         elif feat_dim > 1:
-            dense_feat_inds = feat_df.loc[inds, feat_name]
+            dense_feat_inds = feat_df[feat_name]
             dense_feat_dict[feat_name] = torch.FloatTensor(array_dict[feat_name][dense_feat_inds, :])
         else:
             raise Exception("illegal dimension")

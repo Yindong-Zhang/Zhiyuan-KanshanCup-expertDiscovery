@@ -9,7 +9,7 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epoches', type= int, default= 10000, help= 'training epoches')
+parser.add_argument('--epoches', type= int, default= 1, help= 'training epoches')
 parser.add_argument('--print_every', type= int, default = 32, help= 'print intervals.')
 parser.add_argument('--patience', type= int, default= 4, help= 'patience epoche for early stopping')
 args = parser.parse_args()
@@ -65,7 +65,7 @@ user_feat_dict = {'sparse': {
 configStr= 'test'
 chkpt_path =  os.path.join(PROJECTPATH, 'chkpt', configStr)
 train_dataset, val_dataset = create_train_val_dataset('../../data',
-                  batchsize= 32,
+                  batchsize= 128,
                   question_feat_dict= query_feat_dict,
                   user_feat_dict= user_feat_dict,
                   answer_feat_dict= history_feat_dict,
@@ -91,12 +91,12 @@ def loop_dataset(model, dataset, optimizer= None):
 
         quest_feats, hist_feat_list, hist_len, user_feats, target = batch
 
-        optimizer.zero_grad()
         predict = model(quest_feats, hist_feat_list, hist_len, user_feats)
         loss = nn.BCELoss()(predict, target)
         auc_score = roc_auc_score(target, predict.detach())
 
         if optimizer is not None:
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
@@ -106,7 +106,7 @@ def loop_dataset(model, dataset, optimizer= None):
         if i % args.print_every == 0:
             print("%d / %d: loss %.4f auc %.4f" %(i, num_batches, mean_loss, mean_auc))
 
-        if i > 20:
+        if i > 64:
             break
 
     return mean_loss, mean_auc
