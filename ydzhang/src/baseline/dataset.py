@@ -12,8 +12,6 @@ class Dataset():
                  batchsize,
                  question_feat_dict,
                  user_feat_dict,
-                 answer_feat_dict,
-                 max_hist_len,
                  day_range):
         """
 
@@ -33,13 +31,11 @@ class Dataset():
         # self.quest_title_array = np.load(os.path.join(self.dataDir, 'question_title_W.npy'))
         self.answer_df = ans_df
         # 利用user id 建立多重索引
-        self.max_hist_len = max_hist_len
         self.user_has_history_set = set(self.answer_df['user_id'].unique())
         self.history_dict= user_hist_dict
         self.batchsize = batchsize
         self.quest_feat_dict = question_feat_dict
         self.user_feat_dict = user_feat_dict
-        self.answer_feat_dict = answer_feat_dict
 
         self.day_range= day_range
         self.inds_list = np.arange(len(self.invite_df))[np.logical_and(self.invite_df['create_day'] >= self.day_range[0], self.invite_df['create_day'] < self.day_range[1])].tolist()
@@ -54,35 +50,10 @@ class Dataset():
             batch_invite_df= self.invite_df.loc[batch_inds, :]
             quest_ids, user_ids, invite_times, is_answer = batch_invite_df['question_id'], batch_invite_df['user_id'], batch_invite_df['create_day'], batch_invite_df['is_answer']
             quest_feats = create_feat_dict(self.quest_feat_dict, quest_ids, self.quest_df, self.quest_array_dict)
-
             user_feats = create_feat_dict(self.user_feat_dict, user_ids, self.user_df, self.user_array_dict)
 
-            hist_feat_list = []
-            hist_len = []
-            # 注意对没有历史记录的用户的处理
-            # 绝大部分时间花在了抽取历史行为数据上，需要降低这部分的时间复杂度
-            # TODO: 简化历史行为的抽取，只使用历史问题的topic 信息。
-            for user_id, invite_time in zip(user_ids, invite_times):
-                if user_id in self.user_has_history_set:
-                    full_history = self.history_dict.loc[user_id]
-                    hist_df = full_history.loc[full_history['create_day'] <= invite_time]
-                    hist_df = hist_df.iloc[-self.max_hist_len:,]
-                    hist_len.append(len(hist_df))
-                    if len(hist_df) > 0:
-                        hist_qids = hist_df['question_id']
-                        hist_aids = hist_df.index # answer_id
-                        hist_ans_feats = create_feat_dict(self.answer_feat_dict, hist_aids, self.answer_df, self.quest_array_dict)
-                        hist_feat_list.append(hist_ans_feats)
-                    else:
-                        hist_feat_list.append((None, None))
-                else:
-                    hist_len.append(0)
-                    hist_feat_list.append((None, None))
-
-            hist_len = torch.LongTensor(hist_len).reshape(-1, 1)
-
             target = torch.FloatTensor(is_answer.values).reshape(-1, 1)
-            yield quest_feats, hist_feat_list, hist_len, user_feats, target
+            yield quest_feats, user_feats, target
 
     def __len__(self):
         return self.num_batches
@@ -92,8 +63,6 @@ def create_train_val_dataset(dataDir,
                              batchsize,
                              question_feat_dict,
                              user_feat_dict,
-                             answer_feat_dict,
-                             max_hist_len,
                              train_day_range,
                              val_day_range):
     invite_df = pd.read_csv(os.path.join(dataDir, 'invite_info_1021.csv'),
@@ -139,15 +108,11 @@ def create_train_val_dataset(dataDir,
                  batchsize,
                  question_feat_dict,
                  user_feat_dict,
-                 answer_feat_dict,
-                 max_hist_len,
                             train_day_range)
     val_dataset = Dataset(invite_df, user_df, user_array_dict,  quest_df, quest_array_dict, answer_df, user_hist_dict,
                  batchsize,
                  question_feat_dict,
                  user_feat_dict,
-                 answer_feat_dict,
-                 max_hist_len,
                             val_day_range)
     return train_dataset, val_dataset
 
@@ -210,8 +175,6 @@ if __name__ == '__main__':
                                                           batchsize= 256,
                                                           question_feat_dict=query_feat_dict,
                                                           user_feat_dict=user_feat_dict,
-                                                          answer_feat_dict=history_feat_dict,
-                                                          max_hist_len=max_hist_len,
                                                           train_day_range=[3838+ 10, 3838 + 25],
                                                           val_day_range=[3838 + 25, 3838 + 30],
                                                       )

@@ -1,5 +1,5 @@
 from src.baseline.dataset import create_train_val_dataset
-from src.baseline.baseline import Model
+from src.baseline.baseline import  Baseline
 from time import time
 from sklearn.metrics import roc_auc_score
 import os
@@ -17,35 +17,36 @@ args = parser.parse_args()
 
 wv_size = 64
 max_hist_len = 16
-query_embed_dim = 128
+query_embed_dim = 256
 hist_embed_dim= 128
-user_embed_dim= 128
+user_embed_dim= 512
 batchsize = 256
+configStr= 'test-baseline'
 
 query_feat_dict = {'sparse': {'has_describe': 2},
                    'dense': {'question_topics_mp': wv_size,
-                             'describe_length': 1,
+#                             'describe_length': 1,
                              # 'title_length': 1,
                              # 'num_answers': 1,
                              }
                    }
-history_feat_dict = {'sparse': {
-    'is_good': 2,
-    # 'is_recommend': 2,
-    'has_picture': 2,
-    'has_video': 2,
-},
-    'dense': {'question_topics_mp': wv_size,
-              'word_count': 1,
-              'num_zan': 1,
-              'num_comment': 1,
-              'num_collect': 1,
-              # 'num_thanks': 1,
+# history_feat_dict = {'sparse': {
+#     'is_good': 2,
+#     'is_recommend': 2,
+    # 'has_picture': 2,
+    # 'has_video': 2,
+# },
+#     'dense': {'question_topics_mp': wv_size,
+#               'word_count': 1,
+#               'num_zan': 1,
+#               'num_comment': 1,
+#               'num_collect': 1,
+#               'num_thanks': 1,
               # 'num_report': 1,
 #              'num_useless': 1,
 #               'num_oppose': 1
-              }
-}
+#               }
+# }
 user_feat_dict = {'sparse': {
     'gender': 3,
     'visit_freq': 5,
@@ -65,22 +66,19 @@ user_feat_dict = {'sparse': {
         'follow_topics_mp': wv_size,
     }
 }
-configStr= 'test'
+
 chkpt_path =  os.path.join(PROJECTPATH, 'chkpt', configStr)
 train_dataset, val_dataset = create_train_val_dataset('../../data',
                   batchsize= batchsize,
                   question_feat_dict= query_feat_dict,
                   user_feat_dict= user_feat_dict,
-                  answer_feat_dict= history_feat_dict,
-                  max_hist_len = max_hist_len,
                                                       train_day_range= [DAYFIRST + 10, DAYFIRST + 25],
                                                       val_day_range= [DAYFIRST + 25, DAYFIRST + 30],
                                                       )
 
-model = Model(query_feat_dict, history_feat_dict, user_feat_dict,
-              query_embed_dim, hist_embed_dim, user_embed_dim,
+model = Baseline(query_feat_dict, user_feat_dict,
+              query_embed_dim, user_embed_dim,
               embed_size=16,
-              max_hist_len=max_hist_len,
               hidden_dim_list=[512, 1],
               device='cpu')
 
@@ -92,9 +90,9 @@ def loop_dataset(model, dataset, optimizer= None):
     mean_auc = 0
     for i, batch in enumerate(dataset):
 
-        quest_feats, hist_feat_list, hist_len, user_feats, target = batch
+        quest_feats, user_feats, target = batch
 
-        predict = model(quest_feats, hist_feat_list, hist_len, user_feats)
+        predict = model(quest_feats, user_feats)
         loss = nn.BCELoss()(predict, target)
         auc_score = roc_auc_score(target, predict.detach())
 
