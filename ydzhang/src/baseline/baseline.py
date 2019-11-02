@@ -2,7 +2,7 @@ from torch import nn
 import torch
 import torch.functional as F
 from src.featureExtractLayer import EmbeddingMLPLayer
-from src.layers import BiLSTMRCNN
+from src.layers import BiLSTMRCNN, FullyConnectedLayer
 from src.DIN import DIN
 from torch.nn.utils.rnn import pad_sequence
 import torch.optim as optim
@@ -11,6 +11,34 @@ import numpy as np
 
 # baseline using pooling layer to extract semantic info rather than RCNN
 
+class Baseline(nn.Module):
+    def __init__(self, query_feat_dict, user_feat_dict,
+                 query_embed_dim, hist_embed_dim, user_profile_dim,
+                 max_hist_len, embed_size,
+                 hidden_dim_list,
+                 device, **kwargs):
+        super(Model, self).__init__(**kwargs)
+        self.hist_embed_dim = hist_embed_dim
+        self.user_profile_dim = user_profile_dim
+        self.query_embed_dim = query_embed_dim
+        self.max_hist_len = max_hist_len
+        self.embed_size = embed_size
+        self.device = device
+        self.query_features_extract_layer = EmbeddingMLPLayer(query_feat_dict,
+                                                              embedding_size= self.embed_size, mlp_hidden_list= [self.query_embed_dim, ])
+        self.user_feature_extract_layer= EmbeddingMLPLayer(user_feat_dict, embedding_size= self.embed_size, mlp_hidden_list= [self.user_profile_dim, ])
+        self.interaction_layer = FullyConnectedLayer(self.query_embed_dim + self.user_profile_dim, hidden_size= [1024, 1])
+
+    def forward(self, query_features, hist_features_list, hist_length, user_features):
+        query_feat_embed = self.query_features_extract_layer(query_features)
+        batchsize = len(hist_features_list)
+
+        user_feat_embed = self.user_feature_extract_layer(user_features)
+        
+#         TODO: concat and mlp 
+        out = self.interaction_layer(torch.concat([query_feat_embed, user_feat_embed], dim= -1))
+    
+        return out
 class Model(nn.Module):
     def __init__(self, query_feat_dict, history_feat_dict, user_feat_dict,
                  query_embed_dim, hist_embed_dim, user_profile_dim,

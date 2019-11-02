@@ -1,5 +1,6 @@
 from src.baseline.dataset import create_train_val_dataset
 from src.baseline.baseline import Model
+from time import time
 from sklearn.metrics import roc_auc_score
 import os
 from src.config import DAYFIRST, PROJECTPATH
@@ -19,6 +20,8 @@ max_hist_len = 16
 query_embed_dim = 128
 hist_embed_dim= 128
 user_embed_dim= 128
+batchsize = 256
+
 query_feat_dict = {'sparse': {'has_describe': 2},
                    'dense': {'question_topics_mp': wv_size,
                              'describe_length': 1,
@@ -35,13 +38,13 @@ history_feat_dict = {'sparse': {
     'dense': {'question_topics_mp': wv_size,
               'word_count': 1,
               'num_zan': 1,
-              'num_cancel_zan': 1,
               'num_comment': 1,
               'num_collect': 1,
-              'num_thanks': 1,
-              'num_report': 1,
-              'num_useless': 1,
-              'num_oppose': 1}
+              # 'num_thanks': 1,
+              # 'num_report': 1,
+#              'num_useless': 1,
+#               'num_oppose': 1
+              }
 }
 user_feat_dict = {'sparse': {
     'gender': 3,
@@ -65,7 +68,7 @@ user_feat_dict = {'sparse': {
 configStr= 'test'
 chkpt_path =  os.path.join(PROJECTPATH, 'chkpt', configStr)
 train_dataset, val_dataset = create_train_val_dataset('../../data',
-                  batchsize= 128,
+                  batchsize= batchsize,
                   question_feat_dict= query_feat_dict,
                   user_feat_dict= user_feat_dict,
                   answer_feat_dict= history_feat_dict,
@@ -81,7 +84,7 @@ model = Model(query_feat_dict, history_feat_dict, user_feat_dict,
               hidden_dim_list=[512, 1],
               device='cpu')
 
-optimizer = optim.Adam(params=model.parameters(), lr=1e-3)
+optimizer = optim.Adam(params=model.parameters(), lr=5e-2)
 
 def loop_dataset(model, dataset, optimizer= None):
     num_batches = len(dataset)
@@ -106,8 +109,8 @@ def loop_dataset(model, dataset, optimizer= None):
         if i % args.print_every == 0:
             print("%d / %d: loss %.4f auc %.4f" %(i, num_batches, mean_loss, mean_auc))
 
-        if i > 64:
-            break
+        # if i > 64:
+        #     break
 
     return mean_loss, mean_auc
 
@@ -115,12 +118,16 @@ best_pfms = 0
 count = 0
 for epoch in range(args.epoches):
     print("training epoch %d ..." %(epoch, ))
+    t0 = time()
     train_loss, train_auc = loop_dataset(model, train_dataset, optimizer)
-    print("training epoch %d: loss %.4f auc %.4f\n" %(epoch, train_loss, train_auc))
+    t1 = time()
+    print("training epoch %d in %d minutes: loss %.4f auc %.4f\n" %(epoch, (t1 - t0) / 60, train_loss, train_auc))
 
     print("validation epoch %d ..." %(epoch, ))
+    t2 = time()
     val_loss, val_auc = loop_dataset(model, val_dataset)
-    print("valid epoch %d: loss %.4f auc %.4f\n" %(epoch, val_loss, val_auc))
+    t3 =time()
+    print("valid epoch %d in %d minutes: loss %.4f auc %.4f\n" %(epoch, (t3 - t2) / 60, val_loss, val_auc))
 
     if epoch > 2:
         break

@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import random
 from math import ceil
+from time import time
 import torch
 
 class Dataset():
@@ -59,6 +60,8 @@ class Dataset():
             hist_feat_list = []
             hist_len = []
             # 注意对没有历史记录的用户的处理
+            # 绝大部分时间花在了抽取历史行为数据上，需要降低这部分的时间复杂度
+            # TODO: 简化历史行为的抽取，只使用历史问题的topic 信息。
             for user_id, invite_time in zip(user_ids, invite_times):
                 if user_id in self.user_has_history_set:
                     full_history = self.history_dict.loc[user_id]
@@ -204,20 +207,27 @@ if __name__ == '__main__':
     #                   )
 
     train_dataset, val_dataset = create_train_val_dataset('../../data',
-                                                          batchsize=32,
+                                                          batchsize= 256,
                                                           question_feat_dict=query_feat_dict,
                                                           user_feat_dict=user_feat_dict,
                                                           answer_feat_dict=history_feat_dict,
                                                           max_hist_len=max_hist_len,
                                                           train_day_range=[3838+ 10, 3838 + 25],
                                                           val_day_range=[3838 + 25, 3838 + 30],
-                                                          )
+                                                      )
+    t0 = time()
     for i, batch in enumerate(train_dataset):
-        print(batch)
-        if i > 20:
-            break
 
-    for i, batch in enumerate(val_dataset):
-        print(batch)
+        print(i)
         if i > 20:
             break
+    t1 = time()
+    print('mean iteration time: %.4f' %((t1 - t0)/ 20, ))
+
+    t2 = time()
+    for i, batch in enumerate(val_dataset):
+        print(i)
+        if i > 20:
+            break
+    t3 = time()
+    print('mean iteration time: %.4f' %((t3 - t2)/ 20, ))
