@@ -1,0 +1,1 @@
+python -m src.baseline.train --epoches 100 --patience 4

@@ -25,7 +25,7 @@ class Baseline(nn.Module):
         self.query_features_extract_layer = EmbeddingMLPLayer(query_feat_dict,
                                                               embedding_size= self.embed_size, mlp_hidden_list= [self.query_embed_dim, ])
         self.user_feature_extract_layer= EmbeddingMLPLayer(user_feat_dict, embedding_size= self.embed_size, mlp_hidden_list= [self.user_profile_dim, ])
-        self.interaction_layer = FullyConnectedLayer(self.query_embed_dim + self.user_profile_dim, hidden_size= hidden_dim_list, sigmoid= True)
+        self.interaction_layer = FullyConnectedLayer(self.query_embed_dim + self.user_profile_dim, hidden_size= hidden_dim_list, activation= 'relu', sigmoid= True)
 
     def forward(self, query_features, user_features):
         query_feat_embed = self.query_features_extract_layer(query_features)

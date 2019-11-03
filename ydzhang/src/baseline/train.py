@@ -18,9 +18,6 @@ args = parser.parse_args()
 
 wv_size = 64
 max_hist_len = 16
-query_embed_dim = 256
-hist_embed_dim= 128
-user_embed_dim= 512
 batchsize = 256
 dataDir = os.path.join(PROJECTPATH, 'data')
 configStr= 'test-baseline'
@@ -73,14 +70,17 @@ train_dataset, val_dataset, test_dataset = create_train_val_test_dataset(dataDir
                                                            batchsize= batchsize,
                                                            quest_dim_dict= query_feat_dict,
                                                            user_dim_dict= user_feat_dict,
-                                                           train_day_range= [DAYFIRST + 10, DAYFIRST + 25],
+                                                           train_day_range= [DAYFIRST + 5, DAYFIRST + 25],
                                                            val_day_range= [DAYFIRST + 25, DAYFIRST + 30],
                                                            )
 
+query_embed_dim = 256
+hist_embed_dim= 128
+user_embed_dim= 512
 model = Baseline(query_feat_dict, user_feat_dict,
               query_embed_dim, user_embed_dim,
               embed_size=16,
-              hidden_dim_list=[1024, 20, 1],
+              hidden_dim_list=[512, 1024, 20, 1],
               device='cpu')
 
 optimizer = optim.Adam(params=model.parameters(), lr=5e-2)
@@ -108,8 +108,8 @@ def loop_dataset(model, dataset, optimizer= None):
         if i % args.print_every == 0:
             print("%d / %d: loss %.4f auc %.4f" %(i, num_batches, mean_loss, mean_auc))
 
-        if i > 64:
-            break
+        # if i > 64:
+        #     break
 
     return mean_loss, mean_auc
 

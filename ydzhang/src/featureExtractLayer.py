@@ -10,7 +10,7 @@ class EmbeddingMLPLayer(nn.Module):
                  feature_dim_dict,
                  embedding_size,
                  mlp_hidden_list,
-                 activation = 'tanh',
+                 activation = 'relu',
                  dropout = 0.1,
                  use_bn = True
                  ):
