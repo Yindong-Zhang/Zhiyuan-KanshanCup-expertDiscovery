@@ -27,9 +27,8 @@ configStr= 'test-baseline'
 
 query_feat_dict = {'sparse': {'has_describe': 2},
                    'dense': {'question_topics_mp': wv_size,
-#                             'describe_length': 1,
-                             # 'title_length': 1,
-                             # 'num_answers': 1,
+                            'describe_W_length': 1,
+                             'title_W_length': 1,
                              }
                    }
 # history_feat_dict = {'sparse': {

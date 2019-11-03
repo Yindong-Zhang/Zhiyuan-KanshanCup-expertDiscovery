@@ -1,1 +1,0 @@
-python train.py --epoches 100 --patience 4
