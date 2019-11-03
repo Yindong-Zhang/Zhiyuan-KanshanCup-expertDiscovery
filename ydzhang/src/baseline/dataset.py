@@ -12,7 +12,8 @@ class Dataset():
                  batchsize,
                  question_feat_dict,
                  user_feat_dict,
-                 day_range):
+                 shuffle= True,
+                 return_target= True):
         """
 
         :param dataDir:
@@ -22,6 +23,7 @@ class Dataset():
         :param answer_feat_dict:
         :param max_hist_len:
         :param day_range: a tuple of [day_first, day_last) to construct dataset.
+        :param return_target: whether to return target
         """
         self.invite_df = invite_df
         self.user_df = user_df
@@ -37,34 +39,41 @@ class Dataset():
         self.quest_feat_dict = question_feat_dict
         self.user_feat_dict = user_feat_dict
 
-        self.day_range= day_range
-        self.inds_list = np.arange(len(self.invite_df))[np.logical_and(self.invite_df['create_day'] >= self.day_range[0], self.invite_df['create_day'] < self.day_range[1])].tolist()
-        self.n_samples = len(self.inds_list)
+        self.inds_list = np.arange(len(self.invite_df)).tolist()
+        self.n_samples = len(self.invite_df)
         self.num_batches = ceil(self.n_samples / self.batchsize)
-        random.shuffle(self.inds_list)
+        self.return_target = return_target
+        self.shuffle = shuffle
+        if self.shuffle:
+            random.shuffle(self.inds_list)
 
     def __iter__(self):
         n_batches = self.num_batches
         for i in range(n_batches):
             batch_inds = self.inds_list[i * self.batchsize : min((i + 1 ) * self.batchsize, self.n_samples)]
-            batch_invite_df= self.invite_df.loc[batch_inds, :]
-            quest_ids, user_ids, invite_times, is_answer = batch_invite_df['question_id'], batch_invite_df['user_id'], batch_invite_df['create_day'], batch_invite_df['is_answer']
+            batch_invite_df= self.invite_df.iloc[batch_inds, :]
+            quest_ids, user_ids, invite_times = batch_invite_df['question_id'], batch_invite_df['user_id'], batch_invite_df['create_day']
             quest_feats = create_feat_dict(self.quest_feat_dict, quest_ids, self.quest_df, self.quest_array_dict)
             user_feats = create_feat_dict(self.user_feat_dict, user_ids, self.user_df, self.user_array_dict)
 
-            target = torch.FloatTensor(is_answer.values).reshape(-1, 1)
-            yield quest_feats, user_feats, target
+            outputs = [quest_feats, user_feats]
+            if self.return_target:
+                is_answer =  batch_invite_df['is_answer']
+                target = torch.FloatTensor(is_answer.values).reshape(-1, 1)
+                outputs.append(target)
+
+            yield outputs
 
     def __len__(self):
         return self.num_batches
 
 
-def create_train_val_dataset(dataDir,
-                             batchsize,
-                             question_feat_dict,
-                             user_feat_dict,
-                             train_day_range,
-                             val_day_range):
+def create_train_val_test_dataset(dataDir,
+                                  batchsize,
+                                  quest_dim_dict,
+                                  user_dim_dict,
+                                  train_day_range,
+                                  val_day_range):
     invite_df = pd.read_csv(os.path.join(dataDir, 'invite_info_1021.csv'),
                                  usecols=['question_id', 'user_id', 'create_day', 'is_answer'],
                                  sep='\t',
@@ -103,18 +112,29 @@ def create_train_val_dataset(dataDir,
                                  # nrows= 10000,
                                  )
     user_hist_dict= answer_df[['question_id', 'user_id', 'create_day']].set_index(['user_id', answer_df.index])
+    test_df = pd.read_csv(os.path.join(dataDir, 'invite_info_evaluate_1021.csv'),
+                          usecols= ['question_id', 'user_id', 'create_day'],
+                          sep= '\t')
     print('Load data complete.')
-    train_dataset = Dataset(invite_df, user_df, user_array_dict,  quest_df, quest_array_dict, answer_df, user_hist_dict,
-                 batchsize,
-                 question_feat_dict,
-                 user_feat_dict,
-                            train_day_range)
-    val_dataset = Dataset(invite_df, user_df, user_array_dict,  quest_df, quest_array_dict, answer_df, user_hist_dict,
-                 batchsize,
-                 question_feat_dict,
-                 user_feat_dict,
-                            val_day_range)
-    return train_dataset, val_dataset
+    train_invite_df = invite_df.loc[np.logical_and(invite_df['create_day'] >= train_day_range[0], invite_df['create_day'] < train_day_range[1])]
+    val_invite_df = invite_df.loc[np.logical_and(invite_df['create_day'] >= val_day_range[0], invite_df['create_day'] < val_day_range[1])]
+    train_dataset = Dataset(train_invite_df, user_df, user_array_dict, quest_df, quest_array_dict, answer_df, user_hist_dict,
+                            batchsize,
+                            quest_dim_dict,
+                            user_dim_dict)
+    val_dataset = Dataset(val_invite_df, user_df, user_array_dict, quest_df, quest_array_dict, answer_df, user_hist_dict,
+                          batchsize,
+                          quest_dim_dict,
+                          user_dim_dict,
+                          )
+    test_dataset = Dataset(test_df, user_df, user_array_dict, quest_df, quest_array_dict, answer_df, user_hist_dict,
+                           batchsize,
+                           quest_dim_dict,
+                           user_dim_dict,
+                           return_target= False,
+                           shuffle= False,
+                           )
+    return train_dataset, val_dataset, test_dataset
 
 
 if __name__ == '__main__':
@@ -171,13 +191,13 @@ if __name__ == '__main__':
     #                   max_hist_len = max_hist_len,
     #                   )
 
-    train_dataset, val_dataset = create_train_val_dataset('../../data',
-                                                          batchsize= 256,
-                                                          question_feat_dict=query_feat_dict,
-                                                          user_feat_dict=user_feat_dict,
-                                                          train_day_range=[3838+ 10, 3838 + 25],
-                                                          val_day_range=[3838 + 25, 3838 + 30],
-                                                      )
+    train_dataset, val_dataset, test_dataset = create_train_val_test_dataset('../../data',
+                                                                             batchsize= 256,
+                                                                             quest_dim_dict=query_feat_dict,
+                                                                             user_dim_dict=user_feat_dict,
+                                                                             train_day_range=[3838+ 20, 3838 + 25],
+                                                                             val_day_range=[3838 + 25, 3838 + 30],
+                                                                             )
     t0 = time()
     for i, batch in enumerate(train_dataset):
 
@@ -194,3 +214,11 @@ if __name__ == '__main__':
             break
     t3 = time()
     print('mean iteration time: %.4f' %((t3 - t2)/ 20, ))
+
+    t4 = time()
+    for i, batch in enumerate(test_dataset):
+        print(i)
+        if i > 20:
+            break
+    t5 = time()
+    print('mean iteration time: %.4f' %((t5 - t4)/ 20, ))

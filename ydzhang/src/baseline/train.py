@@ -1,7 +1,8 @@
-from src.baseline.dataset import create_train_val_dataset
+from src.baseline.dataset import create_train_val_test_dataset
 from src.baseline.baseline import  Baseline
 from time import time
 from sklearn.metrics import roc_auc_score
+import pandas as pd
 import os
 from src.config import DAYFIRST, PROJECTPATH
 import torch
@@ -21,6 +22,7 @@ query_embed_dim = 256
 hist_embed_dim= 128
 user_embed_dim= 512
 batchsize = 256
+dataDir = os.path.join(PROJECTPATH, 'data')
 configStr= 'test-baseline'
 
 query_feat_dict = {'sparse': {'has_describe': 2},
@@ -68,18 +70,18 @@ user_feat_dict = {'sparse': {
 }
 
 chkpt_path =  os.path.join(PROJECTPATH, 'chkpt', configStr)
-train_dataset, val_dataset = create_train_val_dataset('../../data',
-                  batchsize= batchsize,
-                  question_feat_dict= query_feat_dict,
-                  user_feat_dict= user_feat_dict,
-                                                      train_day_range= [DAYFIRST + 10, DAYFIRST + 25],
-                                                      val_day_range= [DAYFIRST + 25, DAYFIRST + 30],
-                                                      )
+train_dataset, val_dataset, test_dataset = create_train_val_test_dataset(dataDir,
+                                                           batchsize= batchsize,
+                                                           quest_dim_dict= query_feat_dict,
+                                                           user_dim_dict= user_feat_dict,
+                                                           train_day_range= [DAYFIRST + 10, DAYFIRST + 25],
+                                                           val_day_range= [DAYFIRST + 25, DAYFIRST + 30],
+                                                           )
 
 model = Baseline(query_feat_dict, user_feat_dict,
               query_embed_dim, user_embed_dim,
               embed_size=16,
-              hidden_dim_list=[512, 1],
+              hidden_dim_list=[1024, 20, 1],
               device='cpu')
 
 optimizer = optim.Adam(params=model.parameters(), lr=5e-2)
@@ -107,8 +109,8 @@ def loop_dataset(model, dataset, optimizer= None):
         if i % args.print_every == 0:
             print("%d / %d: loss %.4f auc %.4f" %(i, num_batches, mean_loss, mean_auc))
 
-        # if i > 64:
-        #     break
+        if i > 64:
+            break
 
     return mean_loss, mean_auc
 
@@ -117,12 +119,14 @@ count = 0
 for epoch in range(args.epoches):
     print("training epoch %d ..." %(epoch, ))
     t0 = time()
+    model.train()
     train_loss, train_auc = loop_dataset(model, train_dataset, optimizer)
     t1 = time()
     print("training epoch %d in %d minutes: loss %.4f auc %.4f\n" %(epoch, (t1 - t0) / 60, train_loss, train_auc))
 
     print("validation epoch %d ..." %(epoch, ))
     t2 = time()
+    model.eval()
     val_loss, val_auc = loop_dataset(model, val_dataset)
     t3 =time()
     print("valid epoch %d in %d minutes: loss %.4f auc %.4f\n" %(epoch, (t3 - t2) / 60, val_loss, val_auc))
@@ -140,3 +144,18 @@ for epoch in range(args.epoches):
             print("early stopping at epoch %d: performance %.4f." %(epoch, best_pfms))
 
 model = torch.load(chkpt_path)
+
+
+res_list = []
+for i, batch in enumerate(test_dataset):
+    quest_feats, user_feats = batch
+
+    predict = model(quest_feats, user_feats)
+    res_list.extend(predict.detach().numpy().squeeze().tolist())
+
+test_df = pd.read_csv(os.path.join(dataDir, 'invite_info_evaluate_1021.csv'),
+                      sep= '\t',
+                      usecols= ['question_id', 'user_id', 'create_time'])
+test_df['predict_value'] = res_list
+
+test_df.to_csv(os.path.join(dataDir, 'result_1103.csv'), sep= '\t', header= False, index= False)
