@@ -21,7 +21,7 @@ wv_size = 64
 max_hist_len = 16
 batchsize = 256
 dataDir = os.path.join(PROJECTPATH, 'data')
-configStr= 'test-baseline'
+configStr= 'test-baseline-1'
 
 query_feat_dict = {'sparse': {'has_describe': 2},
                    'dense': {'question_topics_mp': wv_size,
@@ -62,6 +62,7 @@ user_feat_dict = {'sparse': {
     'category_E': 2,
 },
     'dense': {
+        # 'answer_count': 1,
         'salt_value': 1,
         'follow_topics_mp': wv_size,
         'interest_topics_wp': wv_size,
@@ -87,10 +88,11 @@ else:
     model = Baseline(query_feat_dict, user_feat_dict,
               query_embed_dim, user_embed_dim,
               embed_size=16,
-              hidden_dim_list=[512, 1024, 20, 1],
+              hidden_dim_list=[1024, 20, 1],
               device='cpu')
 
-optimizer = optim.Adam(params=model.parameters(), lr=5e-2)
+optimizer = optim.Adam([{'params': model.user_feature_extract_layer.embedding_layer_dict['user_index'].parameters(), 'weight_decay': 1E-3}],
+                       lr= 5E-3)
 
 def loop_dataset(model, dataset, optimizer= None):
     num_batches = len(dataset)
@@ -101,7 +103,7 @@ def loop_dataset(model, dataset, optimizer= None):
         quest_feats, user_feats, target = batch
 
         predict = model(quest_feats, user_feats)
-        print(predict, target)
+        # print(predict, target)
         loss = nn.BCELoss()(predict, target)
         auc_score = roc_auc_score(target, predict.detach())
 
@@ -138,9 +140,6 @@ for epoch in range(args.epoches):
     t3 =time()
     print("valid epoch %d in %d minutes: loss %.4f auc %.4f\n" %(epoch, (t3 - t2) / 60, val_loss, val_auc))
 
-    if epoch > 2:
-        break
-
     if val_auc > best_pfms:
         best_pfms = val_auc
         torch.save(model, chkpt_path)
@@ -152,17 +151,19 @@ for epoch in range(args.epoches):
 
 model = torch.load(chkpt_path)
 
-
+print('predicting...')
 res_list = []
 for i, batch in enumerate(test_dataset):
     quest_feats, user_feats = batch
 
     predict = model(quest_feats, user_feats)
     res_list.extend(predict.detach().numpy().squeeze().tolist())
+    if i % args.print_every == 0:
+        print('%d / %d predicted' %(i, len(test_dataset)))
 
 test_df = pd.read_csv(os.path.join(dataDir, 'invite_info_evaluate_1021.csv'),
                       sep= '\t',
                       usecols= ['question_id', 'user_id', 'create_time'])
 test_df['predict_value'] = res_list
 
-test_df.to_csv(os.path.join(dataDir, 'result_1104.csv'), sep= '\t', header= False, index= False)
+test_df.to_csv(os.path.join(dataDir, 'result_%s.txt' %(configStr, )), sep= '\t', header= False, index= False)

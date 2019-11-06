@@ -1,31 +1,12 @@
+from src.datasets import create_feat_dict
 import os
 import pandas as pd
 import numpy as np
 import random
 from math import ceil
+from time import time
 import torch
 from src.config import WVSIZE
-def create_feat_dict(feat_dim_dict, inds, feat_df, array_dict):
-    """
-
-    :param feat_dim_dict: {'dense': {'feat name': 1, 'feat_name': 128}, 'sparse': {'feat name': 4, 'feat name: 12}}
-    :param feat_df
-    :param array_dict: dictionary of array for vector features
-    :return: a feature column dictionary replace dimension with feature column
-    """
-    feat_df = feat_df.loc[inds, :]
-    sparse_feat_dict = {feat_name: torch.LongTensor(feat_df[feat_name]) for feat_name in feat_dim_dict['sparse']}
-    dense_feat_dict = {}
-    for feat_name, feat_dim in feat_dim_dict['dense'].items():
-        if feat_dim == 1:
-            dense_feat_dict[feat_name] = torch.FloatTensor(feat_df[feat_name]).reshape(-1, 1)
-        elif feat_dim > 1:
-            dense_feat_inds = feat_df[feat_name]
-            dense_feat_dict[feat_name] = torch.FloatTensor(array_dict[feat_name][dense_feat_inds, :])
-        else:
-            raise Exception("illegal dimension")
-    return {'dense': dense_feat_dict, 'sparse': sparse_feat_dict}
-
 
 class Dataset():
     def __init__(self, invite_df, user_df, user_array_dict,  quest_df, quest_array_dict, ans_df, user_hist_dict,
@@ -186,34 +167,34 @@ def create_train_val_test_dataset(dataDir,
     return train_dataset, val_dataset, test_dataset
 
 
-
 if __name__ == '__main__':
-    wv_size = 64
+    wv_size = WVSIZE
+    max_hist_len = 16
     query_feat_dict = {'sparse': {'has_describe': 2},
                        'dense': {'question_topics_mp': wv_size,
-                                 'describe_length': 1,
-                                 # 'title_length': 1,
-                                 # 'num_answers': 1,
+                                 'describe_W_length': 1,
+                                 'title_W_length': 1,
                                  }
                        }
-    history_feat_dict = {'sparse': {
-        'is_good': 2,
-        # 'is_recommend': 2,
-        'has_picture': 2,
-        'has_video': 2,
-    },
-        'dense': {'question_topics_mp': wv_size,
-                  'word_count': 1,
-                  'num_zan': 1,
-                  'num_cancel_zan': 1,
-                  'num_comment': 1,
-                  'num_collect': 1,
-                  'num_thanks': 1,
-                  'num_report': 1,
-                  'num_useless': 1,
-                  'num_oppose': 1}
-    }
+    # history_feat_dict = {'sparse': {
+    #     'is_good': 2,
+    #     'is_recommend': 2,
+    # 'has_picture': 2,
+    # 'has_video': 2,
+    # },
+    #     'dense': {'question_topics_mp': wv_size,
+    #               'word_count': 1,
+    #               'num_zan': 1,
+    #               'num_comment': 1,
+    #               'num_collect': 1,
+    #               'num_thanks': 1,
+    # 'num_report': 1,
+    #              'num_useless': 1,
+    #               'num_oppose': 1
+    #               }
+    # }
     user_feat_dict = {'sparse': {
+        'user_index': 1931654,
         'gender': 3,
         'visit_freq': 5,
         'binary_A': 2,
@@ -221,24 +202,55 @@ if __name__ == '__main__':
         'binary_C': 2,
         'binary_D': 2,
         'binary_E': 2,
-        'category_A': 100,
-        'category_B': 100,
-        'category_C': 100,
-        'category_D': 100,
-        'category_E': 100,
+        'category_A': 150,
+        'category_B': 150,
+        'category_C': 150,
+        'category_D': 150,
+        'category_E': 2,
     },
         'dense': {
             'salt_value': 1,
             'follow_topics_mp': wv_size,
+            'interest_topics_wp': wv_size,
         }
     }
-    dataset = Dataset('../data',
-                      batchsize= 32,
-                      question_feat_dict= query_feat_dict,
-                      user_feat_dict= user_feat_dict,
-                      answer_feat_dict= history_feat_dict)
-    for i, batch in enumerate(dataset):
-        print(batch)
-        if i > 20:
-            break;
+    # dataset = Dataset('../../data',
+    #                   batchsize= 32,
+    #                   question_feat_dict= query_feat_dict,
+    #                   user_feat_dict= user_feat_dict,
+    #                   answer_feat_dict= history_feat_dict,
+    #                   max_hist_len = max_hist_len,
+    #                   )
 
+    train_dataset, val_dataset, test_dataset = create_train_val_test_dataset('../../data',
+                                                                             batchsize= 256,
+                                                                             quest_dim_dict=query_feat_dict,
+                                                                             user_dim_dict=user_feat_dict,
+                                                                             max_hist_len= 32,
+                                                                             train_day_range=[3838+ 20, 3838 + 25],
+                                                                             val_day_range=[3838 + 25, 3838 + 30],
+                                                                             )
+    t0 = time()
+    for i, batch in enumerate(train_dataset):
+
+        print(i)
+        if i > 20:
+            break
+    t1 = time()
+    print('mean iteration time: %.4f' %((t1 - t0)/ 20, ))
+
+    t2 = time()
+    for i, batch in enumerate(val_dataset):
+        print(i)
+        if i > 20:
+            break
+    t3 = time()
+    print('mean iteration time: %.4f' %((t3 - t2)/ 20, ))
+
+    t4 = time()
+    for i, batch in enumerate(test_dataset):
+        print(i)
+        if i > 20:
+            break
+    t5 = time()
+    print('mean iteration time: %.4f' %((t5 - t4)/ 20, ))

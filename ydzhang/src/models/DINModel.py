@@ -30,19 +30,12 @@ class Model(nn.Module):
         self.user_feature_extract_layer= EmbeddingMLPLayer(user_feat_dict, embedding_size= self.embed_size, mlp_hidden_list= [self.user_profile_dim, ])
         self.interaction_layer = DIN(query_embed_dim, hist_embed_dim, user_profile_dim, hidden_dim_list = hidden_dim_list, use_sigmoid= True)
 
-    def forward(self, query_features, hist_features_list, hist_length, user_features):
+    def forward(self, query_features, hist_features, hist_length, user_features):
         query_feat_embed = self.query_features_extract_layer(query_features)
-        batchsize = len(hist_features_list)
-
-        hist_feat_embed = torch.zeros((batchsize, self.max_hist_len, self.hist_embed_dim)).to(self.device)
-        for i ,(length,  answer_features) in enumerate(zip(hist_length, hist_features_list)):
-            if length > 0:
-                hist_feat_embed[i, :length] = self.hist_features_extract_layer(answer_features)
-        #print(hist_feat_embed.shape)
 
         user_feat_embed = self.user_feature_extract_layer(user_features)
 
-        out = self.interaction_layer(query_feat_embed, hist_feat_embed, hist_length, user_feat_embed)
+        out = self.interaction_layer(query_feat_embed, hist_features, hist_length, user_feat_embed)
         return out
 
 if __name__ == '__main__':

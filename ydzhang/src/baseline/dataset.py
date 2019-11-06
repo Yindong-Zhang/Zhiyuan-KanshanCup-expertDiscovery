@@ -6,6 +6,7 @@ import random
 from math import ceil
 from time import time
 import torch
+from src.config import WVSIZE
 
 class Dataset():
     def __init__(self, invite_df, user_df, user_array_dict,  quest_df, quest_array_dict, ans_df, user_hist_dict,
@@ -72,6 +73,7 @@ def create_train_val_test_dataset(dataDir,
                                   batchsize,
                                   quest_dim_dict,
                                   user_dim_dict,
+                                  max_hist_len,
                                   train_day_range,
                                   val_day_range):
     invite_df = pd.read_csv(os.path.join(dataDir, 'invite_info_1021.csv'),
@@ -91,7 +93,10 @@ def create_train_val_test_dataset(dataDir,
                                # nrows= 10000,
                                )
     user_follow_topics_mp = np.load(os.path.join(dataDir, 'user_follow_topics_mp.npy'))
-    user_array_dict = {'follow_topics_mp': user_follow_topics_mp}
+    user_interest_topics_wp = np.load(os.path.join(dataDir, 'interest_topic_wp.npy'))
+    user_array_dict = {'follow_topics_mp': user_follow_topics_mp,
+                            'interest_topics_wp': user_interest_topics_wp
+                            }
     quest_df = pd.read_csv(os.path.join(dataDir, 'question_info_1021.csv'),
                                 # usecols= ['question_id', 'title_SW', 'title_W', 'question_topics_mp', 'title_W_ind', 'create_day',
                                 #           'has_describe', 'describe_length'],
@@ -121,16 +126,20 @@ def create_train_val_test_dataset(dataDir,
     train_dataset = Dataset(train_invite_df, user_df, user_array_dict, quest_df, quest_array_dict, answer_df, user_hist_dict,
                             batchsize,
                             quest_dim_dict,
-                            user_dim_dict)
+                            user_dim_dict,
+                            max_hist_len,
+                            )
     val_dataset = Dataset(val_invite_df, user_df, user_array_dict, quest_df, quest_array_dict, answer_df, user_hist_dict,
                           batchsize,
                           quest_dim_dict,
                           user_dim_dict,
+                          max_hist_len,
                           )
     test_dataset = Dataset(test_df, user_df, user_array_dict, quest_df, quest_array_dict, answer_df, user_hist_dict,
                            batchsize,
                            quest_dim_dict,
                            user_dim_dict,
+                           max_hist_len,
                            return_target= False,
                            shuffle= False,
                            )
@@ -138,33 +147,33 @@ def create_train_val_test_dataset(dataDir,
 
 
 if __name__ == '__main__':
-    wv_size = 64
+    wv_size = WVSIZE
     max_hist_len = 16
     query_feat_dict = {'sparse': {'has_describe': 2},
                        'dense': {'question_topics_mp': wv_size,
-                                 'describe_length': 1,
-                                 # 'title_length': 1,
-                                 # 'num_answers': 1,
+                                 'describe_W_length': 1,
+                                 'title_W_length': 1,
                                  }
                        }
-    history_feat_dict = {'sparse': {
-        'is_good': 2,
-        # 'is_recommend': 2,
-        'has_picture': 2,
-        'has_video': 2,
-    },
-        'dense': {'question_topics_mp': wv_size,
-                  'word_count': 1,
-                  'num_zan': 1,
-                  'num_cancel_zan': 1,
-                  'num_comment': 1,
-                  'num_collect': 1,
-                  'num_thanks': 1,
-                  'num_report': 1,
-                  'num_useless': 1,
-                  'num_oppose': 1}
-    }
+    # history_feat_dict = {'sparse': {
+    #     'is_good': 2,
+    #     'is_recommend': 2,
+    # 'has_picture': 2,
+    # 'has_video': 2,
+    # },
+    #     'dense': {'question_topics_mp': wv_size,
+    #               'word_count': 1,
+    #               'num_zan': 1,
+    #               'num_comment': 1,
+    #               'num_collect': 1,
+    #               'num_thanks': 1,
+    # 'num_report': 1,
+    #              'num_useless': 1,
+    #               'num_oppose': 1
+    #               }
+    # }
     user_feat_dict = {'sparse': {
+        'user_index': 1931654,
         'gender': 3,
         'visit_freq': 5,
         'binary_A': 2,
@@ -172,15 +181,16 @@ if __name__ == '__main__':
         'binary_C': 2,
         'binary_D': 2,
         'binary_E': 2,
-        'category_A': 100,
-        'category_B': 100,
-        'category_C': 100,
-        'category_D': 100,
-        'category_E': 100,
+        'category_A': 150,
+        'category_B': 150,
+        'category_C': 150,
+        'category_D': 150,
+        'category_E': 2,
     },
         'dense': {
             'salt_value': 1,
             'follow_topics_mp': wv_size,
+            'interest_topics_wp': wv_size,
         }
     }
     # dataset = Dataset('../../data',
@@ -195,6 +205,7 @@ if __name__ == '__main__':
                                                                              batchsize= 256,
                                                                              quest_dim_dict=query_feat_dict,
                                                                              user_dim_dict=user_feat_dict,
+                                                                             max_hist_len= 32,
                                                                              train_day_range=[3838+ 20, 3838 + 25],
                                                                              val_day_range=[3838 + 25, 3838 + 30],
                                                                              )
