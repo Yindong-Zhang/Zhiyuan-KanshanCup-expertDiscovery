@@ -15,13 +15,16 @@ parser.add_argument('--epoches', type= int, default= 1, help= 'training epoches'
 parser.add_argument('--print_every', type= int, default = 32, help= 'print intervals.')
 parser.add_argument('--patience', type= int, default= 4, help= 'patience epoche for early stopping')
 parser.add_argument('--pretrain', action= 'store_true', default= False,  help= 'whether to user pretrained model')
+parser.add_argument('--weight_decay', type= float, default= 1E-6, help= 'weight decay for user index embedding')
+parser.add_argument('--lr', type= float, default= 5E-2, help= 'learning rate')
 args = parser.parse_args()
+print(args)
 
 wv_size = 64
 max_hist_len = 16
 batchsize = 256
 dataDir = os.path.join(PROJECTPATH, 'data')
-configStr= 'test-baseline-1'
+configStr= 'test-baseline-1106'
 
 query_feat_dict = {'sparse': {'has_describe': 2},
                    'dense': {'question_topics_mp': wv_size,
@@ -47,7 +50,6 @@ query_feat_dict = {'sparse': {'has_describe': 2},
 #               }
 # }
 user_feat_dict = {'sparse': {
-    'user_index': 1931654,
     'gender': 3,
     'visit_freq': 5,
     'binary_A': 2,
@@ -63,6 +65,8 @@ user_feat_dict = {'sparse': {
 },
     'dense': {
         # 'answer_count': 1,
+        'answer_count': 1,
+        'accept_ratio': 1,
         'salt_value': 1,
         'follow_topics_mp': wv_size,
         'interest_topics_wp': wv_size,
@@ -74,7 +78,7 @@ train_dataset, val_dataset, test_dataset = create_train_val_test_dataset(dataDir
                                                            batchsize= batchsize,
                                                            quest_dim_dict= query_feat_dict,
                                                            user_dim_dict= user_feat_dict,
-                                                           train_day_range= [DAYFIRST + 5, DAYFIRST + 25],
+                                                           train_day_range= [DAYFIRST + 10, DAYFIRST + 25],
                                                            val_day_range= [DAYFIRST + 25, DAYFIRST + 30],
                                                            )
 
@@ -91,8 +95,7 @@ else:
               hidden_dim_list=[1024, 20, 1],
               device='cpu')
 
-optimizer = optim.Adam([{'params': model.user_feature_extract_layer.embedding_layer_dict['user_index'].parameters(), 'weight_decay': 1E-3}],
-                       lr= 5E-3)
+optimizer = optim.Adam(lr= args.lr)
 
 def loop_dataset(model, dataset, optimizer= None):
     num_batches = len(dataset)
@@ -118,8 +121,8 @@ def loop_dataset(model, dataset, optimizer= None):
         if i % args.print_every == 0:
             print("%d / %d: loss %.4f auc %.4f" %(i, num_batches, mean_loss, mean_auc))
 
-        if i > 64:
-            break
+        # if i > 64:
+        #     break
 
     return mean_loss, mean_auc
 

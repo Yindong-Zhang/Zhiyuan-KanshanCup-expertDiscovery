@@ -9,7 +9,7 @@ import torch
 from src.config import WVSIZE
 
 class Dataset():
-    def __init__(self, invite_df, user_df, user_array_dict,  quest_df, quest_array_dict, ans_df, user_hist_dict,
+    def __init__(self, invite_df, user_df, user_array_dict,  quest_df, quest_array_dict,
                  batchsize,
                  question_feat_dict,
                  user_feat_dict,
@@ -32,10 +32,6 @@ class Dataset():
         self.quest_df = quest_df
         self.quest_array_dict = quest_array_dict
         # self.quest_title_array = np.load(os.path.join(self.dataDir, 'question_title_W.npy'))
-        self.answer_df = ans_df
-        # 利用user id 建立多重索引
-        self.user_has_history_set = set(self.answer_df['user_id'].unique())
-        self.history_dict= user_hist_dict
         self.batchsize = batchsize
         self.quest_feat_dict = question_feat_dict
         self.user_feat_dict = user_feat_dict
@@ -73,7 +69,6 @@ def create_train_val_test_dataset(dataDir,
                                   batchsize,
                                   quest_dim_dict,
                                   user_dim_dict,
-                                  max_hist_len,
                                   train_day_range,
                                   val_day_range):
     invite_df = pd.read_csv(os.path.join(dataDir, 'invite_info_1021.csv'),
@@ -106,40 +101,26 @@ def create_train_val_test_dataset(dataDir,
                                 )
     quest_array_dict = {'question_topics_mp': np.load(os.path.join(dataDir, 'question_topics_mp.npy'))}
     # self.quest_title_array = np.load(os.path.join(self.dataDir, 'question_title_W.npy'))
-    answer_df = pd.read_csv(os.path.join(dataDir, 'answer_info_1021.csv'),
-                                 usecols = ['answer_id', 'question_id', 'user_id', 'create_day',
-                                          #'answer_SW', 'answer_W',
-                                            'is_good', 'has_picture', 'has_video',
-                                          'word_count', 'num_zan', 'num_cancel_zan', 'num_comment', 'num_collect',
-                                          'num_thanks', 'num_report', 'num_useless', 'num_oppose', 'question_topics_mp'],
-                                 index_col=['answer_id'],
-                                 sep='\t',
-                                 # nrows= 10000,
-                                 )
-    user_hist_dict= answer_df[['question_id', 'user_id', 'create_day']].set_index(['user_id', answer_df.index])
     test_df = pd.read_csv(os.path.join(dataDir, 'invite_info_evaluate_1021.csv'),
                           usecols= ['question_id', 'user_id', 'create_day'],
                           sep= '\t')
     print('Load data complete.')
     train_invite_df = invite_df.loc[np.logical_and(invite_df['create_day'] >= train_day_range[0], invite_df['create_day'] < train_day_range[1])]
     val_invite_df = invite_df.loc[np.logical_and(invite_df['create_day'] >= val_day_range[0], invite_df['create_day'] < val_day_range[1])]
-    train_dataset = Dataset(train_invite_df, user_df, user_array_dict, quest_df, quest_array_dict, answer_df, user_hist_dict,
+    train_dataset = Dataset(train_invite_df, user_df, user_array_dict, quest_df, quest_array_dict,
                             batchsize,
                             quest_dim_dict,
                             user_dim_dict,
-                            max_hist_len,
                             )
-    val_dataset = Dataset(val_invite_df, user_df, user_array_dict, quest_df, quest_array_dict, answer_df, user_hist_dict,
+    val_dataset = Dataset(val_invite_df, user_df, user_array_dict, quest_df, quest_array_dict,
                           batchsize,
                           quest_dim_dict,
                           user_dim_dict,
-                          max_hist_len,
                           )
-    test_dataset = Dataset(test_df, user_df, user_array_dict, quest_df, quest_array_dict, answer_df, user_hist_dict,
+    test_dataset = Dataset(test_df, user_df, user_array_dict, quest_df, quest_array_dict,
                            batchsize,
                            quest_dim_dict,
                            user_dim_dict,
-                           max_hist_len,
                            return_target= False,
                            shuffle= False,
                            )
