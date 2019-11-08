@@ -13,6 +13,7 @@ class Dataset():
                  batchsize,
                  question_feat_dict,
                  user_feat_dict,
+                 context_feat_dict,
                  shuffle= True,
                  return_target= True):
         """
@@ -35,7 +36,7 @@ class Dataset():
         self.batchsize = batchsize
         self.quest_feat_dict = question_feat_dict
         self.user_feat_dict = user_feat_dict
-
+        self.context_feat_dict = context_feat_dict
         self.inds_list = np.arange(len(self.invite_df)).tolist()
         self.n_samples = len(self.invite_df)
         self.num_batches = ceil(self.n_samples / self.batchsize)
@@ -50,10 +51,11 @@ class Dataset():
             batch_inds = self.inds_list[i * self.batchsize : min((i + 1 ) * self.batchsize, self.n_samples)]
             batch_invite_df= self.invite_df.iloc[batch_inds, :]
             quest_ids, user_ids, invite_times = batch_invite_df['question_id'], batch_invite_df['user_id'], batch_invite_df['create_day']
-            quest_feats = create_feat_dict(self.quest_feat_dict, quest_ids, self.quest_df, self.quest_array_dict)
-            user_feats = create_feat_dict(self.user_feat_dict, user_ids, self.user_df, self.user_array_dict)
+            quest_feats = create_feat_dict(self.quest_feat_dict, self.quest_df.loc[quest_ids], self.quest_array_dict)
+            user_feats = create_feat_dict(self.user_feat_dict, self.user_df.loc[user_ids], self.user_array_dict)
 
-            outputs = [quest_feats, user_feats]
+            context_feats = create_feat_dict(self.context_feat_dict, batch_invite_df, None)
+            outputs = [quest_feats, user_feats, context_feats]
             if self.return_target:
                 is_answer =  batch_invite_df['is_answer']
                 target = torch.FloatTensor(is_answer.values).reshape(-1, 1)
@@ -69,14 +71,17 @@ def create_train_val_test_dataset(dataDir,
                                   batchsize,
                                   quest_dim_dict,
                                   user_dim_dict,
+                                  context_dim_dict,
                                   train_day_range,
                                   val_day_range):
-    invite_df = pd.read_csv(os.path.join(dataDir, 'invite_info_1021.csv'),
-                                 usecols=['question_id', 'user_id', 'create_day', 'is_answer'],
+    print('loading data...')
+    invite_df = pd.read_csv(os.path.join(dataDir, 'invite_info_1107.csv'),
+                                 # usecols=['question_id', 'user_id', 'create_day', 'is_answer'],
                                  sep='\t',
                                  # nrows= 10000,
+                            index_col= 0,
                                  )
-    user_df = pd.read_csv(os.path.join(dataDir, 'member_info_1021.csv'),
+    user_df = pd.read_csv(os.path.join(dataDir, 'member_info_1106.csv'),
                                # usecols= ['user_id', 'gender', 'visit_freq', 'binary_A',
                                #        'binary_B', 'binary_C', 'binary_D', 'binary_E',
                                #        'category_A',
@@ -92,7 +97,7 @@ def create_train_val_test_dataset(dataDir,
     user_array_dict = {'follow_topics_mp': user_follow_topics_mp,
                             'interest_topics_wp': user_interest_topics_wp
                             }
-    quest_df = pd.read_csv(os.path.join(dataDir, 'question_info_1021.csv'),
+    quest_df = pd.read_csv(os.path.join(dataDir, 'question_info_1106.csv'),
                                 # usecols= ['question_id', 'title_SW', 'title_W', 'question_topics_mp', 'title_W_ind', 'create_day',
                                 #           'has_describe', 'describe_length'],
                                 index_col='question_id',
@@ -100,9 +105,8 @@ def create_train_val_test_dataset(dataDir,
                                 # nrows= 10000
                                 )
     quest_array_dict = {'question_topics_mp': np.load(os.path.join(dataDir, 'question_topics_mp.npy'))}
-    # self.quest_title_array = np.load(os.path.join(self.dataDir, 'question_title_W.npy'))
-    test_df = pd.read_csv(os.path.join(dataDir, 'invite_info_evaluate_1021.csv'),
-                          usecols= ['question_id', 'user_id', 'create_day'],
+    test_df = pd.read_csv(os.path.join(dataDir, 'test_invite_info_1107.csv'),
+                          # usecols= ['question_id', 'user_id', 'create_day'],
                           sep= '\t')
     print('Load data complete.')
     train_invite_df = invite_df.loc[np.logical_and(invite_df['create_day'] >= train_day_range[0], invite_df['create_day'] < train_day_range[1])]
@@ -111,16 +115,19 @@ def create_train_val_test_dataset(dataDir,
                             batchsize,
                             quest_dim_dict,
                             user_dim_dict,
+                            context_dim_dict,
                             )
     val_dataset = Dataset(val_invite_df, user_df, user_array_dict, quest_df, quest_array_dict,
                           batchsize,
                           quest_dim_dict,
                           user_dim_dict,
+                          context_dim_dict,
                           )
     test_dataset = Dataset(test_df, user_df, user_array_dict, quest_df, quest_array_dict,
                            batchsize,
                            quest_dim_dict,
                            user_dim_dict,
+                           context_dim_dict,
                            return_target= False,
                            shuffle= False,
                            )

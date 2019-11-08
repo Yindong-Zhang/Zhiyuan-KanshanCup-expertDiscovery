@@ -13,7 +13,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--epoches', type= int, default= 1, help= 'training epoches')
 parser.add_argument('--print_every', type= int, default = 32, help= 'print intervals.')
-parser.add_argument('--patience', type= int, default= 4, help= 'patience epoche for early stopping')
+parser.add_argument('--patience', type= int, default= 1, help= 'patience epoche for early stopping')
 parser.add_argument('--pretrain', action= 'store_true', default= False,  help= 'whether to user pretrained model')
 parser.add_argument('--weight_decay', type= float, default= 1E-6, help= 'weight decay for user index embedding')
 parser.add_argument('--lr', type= float, default= 5E-2, help= 'learning rate')
@@ -24,7 +24,7 @@ wv_size = 64
 max_hist_len = 16
 batchsize = 256
 dataDir = os.path.join(PROJECTPATH, 'data')
-configStr= 'test-baseline-1106'
+configStr= 'test-baseline-1108'
 
 query_feat_dict = {'sparse': {'has_describe': 2},
                    'dense': {'question_topics_mp': wv_size,
@@ -65,7 +65,6 @@ user_feat_dict = {'sparse': {
 },
     'dense': {
         # 'answer_count': 1,
-        'answer_count': 1,
         'accept_ratio': 1,
         'salt_value': 1,
         'follow_topics_mp': wv_size,
@@ -73,12 +72,22 @@ user_feat_dict = {'sparse': {
     }
 }
 
+context_feat_dict = {
+    'sparse': {
+        'create_hour': 25,
+    },
+    'dense': {
+        # 'days_since_last_ans': 1,
+        # 'days_since_last_ans_scaled': 1,
+    }
+}
 chkpt_path =  os.path.join(PROJECTPATH, 'chkpt', configStr)
 train_dataset, val_dataset, test_dataset = create_train_val_test_dataset(dataDir,
                                                            batchsize= batchsize,
                                                            quest_dim_dict= query_feat_dict,
                                                            user_dim_dict= user_feat_dict,
-                                                           train_day_range= [DAYFIRST + 10, DAYFIRST + 25],
+                                                                         context_dim_dict= context_feat_dict,
+                                                           train_day_range= [DAYFIRST + 1, DAYFIRST + 25],
                                                            val_day_range= [DAYFIRST + 25, DAYFIRST + 30],
                                                            )
 
@@ -89,13 +98,13 @@ if args.pretrain:
     print("reload model in %s" %(chkpt_path, ))
     model = torch.load(chkpt_path)
 else:
-    model = Baseline(query_feat_dict, user_feat_dict,
+    model = Baseline(query_feat_dict, user_feat_dict, context_feat_dict,
               query_embed_dim, user_embed_dim,
               embed_size=16,
               hidden_dim_list=[1024, 20, 1],
               device='cpu')
 
-optimizer = optim.Adam(lr= args.lr)
+optimizer = optim.Adam(params= model.parameters(), lr= args.lr)
 
 def loop_dataset(model, dataset, optimizer= None):
     num_batches = len(dataset)
@@ -103,9 +112,9 @@ def loop_dataset(model, dataset, optimizer= None):
     mean_auc = 0
     for i, batch in enumerate(dataset):
 
-        quest_feats, user_feats, target = batch
+        quest_feats, user_feats, context_feats, target = batch
 
-        predict = model(quest_feats, user_feats)
+        predict = model(quest_feats, user_feats, context_feats)
         # print(predict, target)
         loss = nn.BCELoss()(predict, target)
         auc_score = roc_auc_score(target, predict.detach())
@@ -157,16 +166,17 @@ model = torch.load(chkpt_path)
 print('predicting...')
 res_list = []
 for i, batch in enumerate(test_dataset):
-    quest_feats, user_feats = batch
+    quest_feats, user_feats, context_feats= batch
 
-    predict = model(quest_feats, user_feats)
+    predict = model(quest_feats, user_feats, context_feats)
     res_list.extend(predict.detach().numpy().squeeze().tolist())
     if i % args.print_every == 0:
         print('%d / %d predicted' %(i, len(test_dataset)))
 
-test_df = pd.read_csv(os.path.join(dataDir, 'invite_info_evaluate_1021.csv'),
+test_df = pd.read_csv(os.path.join(dataDir, 'test_invite_info_1107.csv'),
                       sep= '\t',
                       usecols= ['question_id', 'user_id', 'create_time'])
 test_df['predict_value'] = res_list
 
-test_df.to_csv(os.path.join(dataDir, 'result_%s.txt' %(configStr, )), sep= '\t', header= False, index= False)
+test_df.to_csv(os.path.join(dataDir, 'result_%s.txt' %(configStr, )), sep= '\t', header= False, index= False,
+               columns = ['question_id', 'user_id', 'create_time', 'predict_value'])

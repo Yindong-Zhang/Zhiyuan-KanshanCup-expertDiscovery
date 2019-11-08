@@ -5,22 +5,21 @@ import random
 from math import ceil
 import torch
 from src.config import WVSIZE
-def create_feat_dict(feat_dim_dict, inds, feat_df, array_dict):
+def create_feat_dict(feat_dim_dict, batch_feat_df, array_dict):
     """
 
     :param feat_dim_dict: {'dense': {'feat name': 1, 'feat_name': 128}, 'sparse': {'feat name': 4, 'feat name: 12}}
-    :param feat_df
+    :param batch_feat_df
     :param array_dict: dictionary of array for vector features
     :return: a feature column dictionary replace dimension with feature column
     """
-    feat_df = feat_df.loc[inds, :]
-    sparse_feat_dict = {feat_name: torch.LongTensor(feat_df[feat_name]) for feat_name in feat_dim_dict['sparse']}
+    sparse_feat_dict = {feat_name: torch.LongTensor(batch_feat_df[feat_name].values) for feat_name in feat_dim_dict['sparse']}
     dense_feat_dict = {}
     for feat_name, feat_dim in feat_dim_dict['dense'].items():
         if feat_dim == 1:
-            dense_feat_dict[feat_name] = torch.FloatTensor(feat_df[feat_name]).reshape(-1, 1)
+            dense_feat_dict[feat_name] = torch.FloatTensor(batch_feat_df[feat_name].values).reshape(-1, 1)
         elif feat_dim > 1:
-            dense_feat_inds = feat_df[feat_name]
+            dense_feat_inds = batch_feat_df[feat_name]
             dense_feat_dict[feat_name] = torch.FloatTensor(array_dict[feat_name][dense_feat_inds, :])
         else:
             raise Exception("illegal dimension")

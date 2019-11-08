@@ -1,7 +1,7 @@
 from torch import nn
 import torch
 import torch.functional as F
-from src.featureExtractLayer import EmbeddingMLPLayer
+from src.featureExtractLayer import EmbeddingMLPLayer, EmbeddingConcatLayer
 from src.layers import BiLSTMRCNN, FullyConnectedLayer
 from src.DIN import DIN
 from torch.nn.utils.rnn import pad_sequence
@@ -12,27 +12,31 @@ import numpy as np
 # baseline using pooling layer to extract semantic info rather than RCNN
 
 class Baseline(nn.Module):
-    def __init__(self, query_feat_dict, user_feat_dict,
+    def __init__(self, query_feat_dict, user_feat_dict, context_feat_dict,
                  query_embed_dim, user_profile_dim,
                  embed_size,
                  hidden_dim_list,
                  device, **kwargs):
         super(Baseline, self).__init__(**kwargs)
+        self.embed_size = embed_size
         self.user_profile_dim = user_profile_dim
         self.query_embed_dim = query_embed_dim
-        self.embed_size = embed_size
+        self.context_embed_dim = self.embed_size * len(context_feat_dict['sparse']) + sum(context_feat_dict['dense'].values())
         self.device = device
         self.query_features_extract_layer = EmbeddingMLPLayer(query_feat_dict,
                                                               embedding_size= self.embed_size, mlp_hidden_list= [self.query_embed_dim, ])
         self.user_feature_extract_layer= EmbeddingMLPLayer(user_feat_dict, embedding_size= self.embed_size, mlp_hidden_list= [self.user_profile_dim, ])
-        self.interaction_layer = FullyConnectedLayer(self.query_embed_dim + self.user_profile_dim, hidden_size= hidden_dim_list, activation= 'relu', sigmoid= True)
+        self.context_feat_layer = EmbeddingConcatLayer(context_feat_dict, embedding_size= self.embed_size, )
+        self.interaction_layer = FullyConnectedLayer(self.query_embed_dim + self.user_profile_dim + self.context_embed_dim, hidden_size= hidden_dim_list, activation= 'relu', sigmoid= True)
 
-    def forward(self, query_features, user_features):
+    def forward(self, query_features, user_features, context_features):
         query_feat_embed = self.query_features_extract_layer(query_features)
 
         user_feat_embed = self.user_feature_extract_layer(user_features)
-        
-        out = self.interaction_layer(torch.cat([query_feat_embed, user_feat_embed], dim= -1))
+
+        context_feat_embed = self.context_feat_layer(context_features)
+
+        out = self.interaction_layer(torch.cat([query_feat_embed, user_feat_embed, context_feat_embed], dim= -1))
     
         return out
 

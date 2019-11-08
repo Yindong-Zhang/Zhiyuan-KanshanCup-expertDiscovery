@@ -81,15 +81,13 @@ class EmbeddingConcatLayer(nn.Module):
         :param input_dict: a input dict like {'sparse': {'field_1': (batchsize, ), 'field_2': (batchsize, )}, 'dense': {'field_3': (batchsize, 1), 'field 4': (batchsize, 1)}}
         :return:
         """
-        sparse_feature_embeddings = []
+        feat_embeds = []
         for sparse_feat, feat_column in input_dict['sparse'].items():
-            sparse_feature_embeddings.append(self.embedding_layer_dict[sparse_feat](feat_column))
+            feat_embeds.append(self.embedding_layer_dict[sparse_feat](feat_column))
 
-        sparse_feature_concated = torch.cat(sparse_feature_embeddings, dim= -1)
+        feat_embeds.extend(list(input_dict['dense'].values()))
 
-        dense_feature_concated = torch.cat(list(input_dict['dense'].values()), dim= -1)
-
-        feature_concated = torch.cat([sparse_feature_concated, dense_feature_concated], dim= -1)
+        feature_concated = torch.cat(feat_embeds, dim= -1)
 
 
         return feature_concated
