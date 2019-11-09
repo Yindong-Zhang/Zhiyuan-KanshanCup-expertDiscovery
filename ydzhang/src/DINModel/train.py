@@ -25,7 +25,7 @@ wv_size = 64
 max_hist_len = 16
 batchsize = 256
 dataDir = os.path.join(PROJECTPATH, 'data')
-configStr= 'test-baseline-1108'
+configStr= 'test-DIN-1109'
 
 query_feat_dict = {'sparse': {'has_describe': 2},
                    'dense': {'question_topics_mp': wv_size,
@@ -66,7 +66,7 @@ user_feat_dict = {'sparse': {
 },
     'dense': {
         # 'answer_count': 1,
-        'accept_ratio': 1,
+        # 'accept_ratio': 1,
         'salt_value': 1,
         'follow_topics_mp': wv_size,
         'interest_topics_wp': wv_size,
@@ -88,8 +88,8 @@ train_dataset, val_dataset, test_dataset = create_train_val_test_dataset(dataDir
                                                            quest_dim_dict= query_feat_dict,
                                                            user_dim_dict= user_feat_dict,
                                                                          context_dim_dict= context_feat_dict,
-                                                                         max_hist_len= 16,
-                                                           train_day_range= [DAYFIRST + 1, DAYFIRST + 25],
+                                                                         max_hist_len= max_hist_len,
+                                                           train_day_range= [DAYFIRST + 15, DAYFIRST + 25],
                                                            val_day_range= [DAYFIRST + 25, DAYFIRST + 30],
                                                            )
 
