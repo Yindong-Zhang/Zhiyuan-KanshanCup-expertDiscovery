@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from src.config import WVSIZE
 
 class Dataset():
-    def __init__(self, invite_df, hist_quest_array, user_df, user_array_dict,  quest_df, quest_array_dict,
+    def __init__(self, invite_df, hist_quest_array, hist_length, user_df, user_array_dict,  quest_df, quest_array_dict,
                  batchsize,
                  question_feat_dict,
                  user_feat_dict,
@@ -30,6 +30,7 @@ class Dataset():
         """
         self.invite_df = invite_df
         self.hist_quest_array = hist_quest_array
+        self.hist_length = hist_length
         self.user_df = user_df
         self.user_array_dict = user_array_dict
         self.quest_df = quest_df
@@ -39,10 +40,10 @@ class Dataset():
         self.quest_feat_dict = question_feat_dict
         self.user_feat_dict = user_feat_dict
         self.context_feat_dict = context_feat_dict
-        self.inds_list = np.arange(len(self.invite_df)).tolist()
         self.n_samples = len(self.invite_df)
         self.num_batches = ceil(self.n_samples / self.batchsize)
         self.return_target = return_target
+        self.inds_list = np.arange(len(self.invite_df)).tolist()
         self.shuffle = shuffle
         if self.shuffle:
             random.shuffle(self.inds_list)
@@ -52,16 +53,16 @@ class Dataset():
         for i in range(n_batches):
             batch_inds = self.inds_list[i * self.batchsize : min((i + 1 ) * self.batchsize, self.n_samples)]
             batch_invite_df= self.invite_df.iloc[batch_inds, :]
-            batch_hist_quest_idx = self.hist_quest_array[batch_inds, :]
-            batch_hist_quest_tp = F.embedding(batch_hist_quest_idx, weight= self.quest_array_dict['question_topics_mp'],
-                                              padding_idx= -1)
+            batch_hist_quest_idx = torch.LongTensor(self.hist_quest_array[batch_inds])
+            batch_hist_length = torch.LongTensor(self.hist_length[batch_inds])
+            hist_quest_tp = F.embedding(batch_hist_quest_idx, weight= torch.FloatTensor(self.quest_array_dict['question_topics_mp']),)
             quest_ids, user_ids, invite_times = batch_invite_df['question_id'], batch_invite_df['user_id'], batch_invite_df['create_day']
             quest_feats = create_feat_dict(self.quest_feat_dict, self.quest_df.loc[quest_ids], self.quest_array_dict)
             user_feats = create_feat_dict(self.user_feat_dict, self.user_df.loc[user_ids], self.user_array_dict)
 
             context_feats = create_feat_dict(self.context_feat_dict, batch_invite_df, None)
 
-            outputs = [quest_feats, user_feats, context_feats]
+            outputs = [quest_feats, hist_quest_tp, batch_hist_length, user_feats, context_feats]
             if self.return_target:
                 is_answer =  batch_invite_df['is_answer']
                 target = torch.FloatTensor(is_answer.values).reshape(-1, 1)
@@ -88,7 +89,7 @@ def create_train_val_test_dataset(dataDir,
                                  # nrows= 10000,
                             index_col= 0,
                                  )
-    hist_quest_array = np.load(os.path.join(dataDir, 'train_hist_quest_array.npy'))[:, :max_hist_len]
+    hist_quest_array =  np.load(os.path.join(dataDir, 'train_hist_quest_array.npy'))[:, :max_hist_len]
     user_df = pd.read_csv(os.path.join(dataDir, 'member_info_1106.csv'),
                                # usecols= ['user_id', 'gender', 'visit_freq', 'binary_A',
                                #        'binary_B', 'binary_C', 'binary_D', 'binary_E',
@@ -113,31 +114,50 @@ def create_train_val_test_dataset(dataDir,
                                 # nrows= 10000
                                 )
     question_topics_mp = np.load(os.path.join(dataDir, 'question_topics_mp.npy'))
+    # add one line of zero vector for no exist question
+    question_topics_mp = np.concatenate([question_topics_mp, np.zeros((1, question_topics_mp.shape[1]))], axis = 0)
+    # np.save(os.path.join(dataDir, 'question_topics_mp.npy'), question_topics_mp)
     quest_array_dict = {'question_topics_mp': question_topics_mp}
     test_df = pd.read_csv(os.path.join(dataDir, 'test_invite_info_1107.csv'),
                           # usecols= ['question_id', 'user_id', 'create_day'],
                           sep= '\t')
     test_hist_quest_array = np.load(os.path.join(dataDir, 'test_hist_quest_array.npy'))[:, :max_hist_len]
     print('Load data complete.')
+
+    # some process
+    hist_length = hist_quest_array.shape[1] - np.sum(hist_quest_array == -1, axis= -1)
+    test_hist_length = test_hist_quest_array.shape[1] - np.sum(test_hist_quest_array == -1, axis= -1)
+    hist_length = hist_length.reshape(-1, 1)
+    test_hist_length = test_hist_length.reshape(-1, 1)
+
+    hist_quest_array[hist_quest_array == -1] = len(quest_df)
+    test_hist_quest_array[test_hist_quest_array == -1] = len(quest_df)
+
+
     train_idx = np.logical_and(invite_df['create_day'] >= train_day_range[0], invite_df['create_day'] < train_day_range[1])
     val_idx = np.logical_and(invite_df['create_day'] >= val_day_range[0], invite_df['create_day'] < val_day_range[1])
     train_invite_df = invite_df.loc[train_idx]
     val_invite_df = invite_df.loc[val_idx]
+
     train_hist_quest_array = hist_quest_array[train_idx]
     val_hist_quest_array = hist_quest_array[val_idx]
-    train_dataset = Dataset(train_invite_df, train_hist_quest_array, user_df, user_array_dict, quest_df, quest_array_dict,
+
+    train_hist_length = hist_length[train_idx]
+    val_hist_length = hist_length[val_idx]
+
+    train_dataset = Dataset(train_invite_df, train_hist_quest_array, train_hist_length, user_df, user_array_dict, quest_df, quest_array_dict,
                             batchsize,
                             quest_dim_dict,
                             user_dim_dict,
                             context_dim_dict,
                             )
-    val_dataset = Dataset(val_invite_df, val_hist_quest_array, user_df, user_array_dict, quest_df, quest_array_dict,
+    val_dataset = Dataset(val_invite_df, val_hist_quest_array, val_hist_length, user_df, user_array_dict, quest_df, quest_array_dict,
                           batchsize,
                           quest_dim_dict,
                           user_dim_dict,
                           context_dim_dict,
                           )
-    test_dataset = Dataset(test_df, test_hist_quest_array, user_df, user_array_dict, quest_df, quest_array_dict,
+    test_dataset = Dataset(test_df, test_hist_quest_array, test_hist_length, user_df, user_array_dict, quest_df, quest_array_dict,
                            batchsize,
                            quest_dim_dict,
                            user_dim_dict,
@@ -217,7 +237,7 @@ if __name__ == '__main__':
                                                                              user_dim_dict=user_feat_dict,
                                                                              context_dim_dict= context_feat_dict,
                                                                              max_hist_len= 16,
-                                                                             train_day_range=[3838+ 20, 3838 + 25],
+                                                                             train_day_range=[3838+ 1, 3838 + 25],
                                                                              val_day_range=[3838 + 25, 3838 + 30],
                                                                              )
     t0 = time()

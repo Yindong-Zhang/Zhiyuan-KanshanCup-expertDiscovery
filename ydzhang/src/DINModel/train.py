@@ -1,5 +1,6 @@
-from src.baseline.dataset import create_train_val_test_dataset
-from src.baseline.baseline import  Baseline
+from src.DINModel.dataset import create_train_val_test_dataset
+from src.DINModel.DINModel import  DINModel
+from src.config import WVSIZE
 from time import time
 from sklearn.metrics import roc_auc_score
 import pandas as pd
@@ -24,7 +25,7 @@ wv_size = 64
 max_hist_len = 16
 batchsize = 256
 dataDir = os.path.join(PROJECTPATH, 'data')
-configStr= 'test-baseline-1108-1'
+configStr= 'test-baseline-1108'
 
 query_feat_dict = {'sparse': {'has_describe': 2},
                    'dense': {'question_topics_mp': wv_size,
@@ -65,7 +66,7 @@ user_feat_dict = {'sparse': {
 },
     'dense': {
         # 'answer_count': 1,
-        # 'accept_ratio': 1,
+        'accept_ratio': 1,
         'salt_value': 1,
         'follow_topics_mp': wv_size,
         'interest_topics_wp': wv_size,
@@ -87,19 +88,21 @@ train_dataset, val_dataset, test_dataset = create_train_val_test_dataset(dataDir
                                                            quest_dim_dict= query_feat_dict,
                                                            user_dim_dict= user_feat_dict,
                                                                          context_dim_dict= context_feat_dict,
+                                                                         max_hist_len= 16,
                                                            train_day_range= [DAYFIRST + 1, DAYFIRST + 25],
                                                            val_day_range= [DAYFIRST + 25, DAYFIRST + 30],
                                                            )
 
 query_embed_dim = 256
-hist_embed_dim= 128
 user_embed_dim= 512
 if args.pretrain:
     print("reload model in %s" %(chkpt_path, ))
     model = torch.load(chkpt_path)
 else:
-    model = Baseline(query_feat_dict, user_feat_dict, context_feat_dict,
-              query_embed_dim, user_embed_dim,
+    model = DINModel(query_feat_dict, user_feat_dict, context_feat_dict,
+              query_embed_dim= query_embed_dim,
+              hist_embed_dim= WVSIZE,
+              user_embed_dim= user_embed_dim,
               embed_size=16,
               hidden_dim_list=[1024, 20, 1],
               device='cpu')
@@ -112,9 +115,9 @@ def loop_dataset(model, dataset, optimizer= None):
     mean_auc = 0
     for i, batch in enumerate(dataset):
 
-        quest_feats, user_feats, context_feats, target = batch
+        quest_feats, hist_quest_feats, hist_len, user_feats, context_feats, target = batch
 
-        predict = model(quest_feats, user_feats, context_feats)
+        predict = model(quest_feats, hist_quest_feats, hist_len, user_feats, context_feats)
         # print(predict, target)
         loss = nn.BCELoss()(predict, target)
         auc_score = roc_auc_score(target, predict.detach())
@@ -166,9 +169,9 @@ model = torch.load(chkpt_path)
 print('predicting...')
 res_list = []
 for i, batch in enumerate(test_dataset):
-    quest_feats, user_feats, context_feats= batch
+    quest_feats, hist_quest_feats, hist_len, user_feats, context_feats= batch
 
-    predict = model(quest_feats, user_feats, context_feats)
+    predict = model(quest_feats, hist_quest_feats, hist_len, user_feats, context_feats)
     res_list.extend(predict.detach().numpy().squeeze().tolist())
     if i % args.print_every == 0:
         print('%d / %d predicted' %(i, len(test_dataset)))
