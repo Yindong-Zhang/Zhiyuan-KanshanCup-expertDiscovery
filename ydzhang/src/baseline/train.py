@@ -5,6 +5,7 @@ from sklearn.metrics import roc_auc_score
 import pandas as pd
 import os
 from src.config import DAYFIRST, PROJECTPATH
+from src.train_utils import move_feat_dict_to_gpu
 import torch
 from torch import optim, nn
 import argparse
@@ -17,18 +18,18 @@ parser.add_argument('--patience', type= int, default= 1, help= 'patience epoche 
 parser.add_argument('--pretrain', action= 'store_true', default= False,  help= 'whether to user pretrained model')
 parser.add_argument('--weight_decay', type= float, default= 1E-6, help= 'weight decay for user index embedding')
 parser.add_argument('--lr', type= float, default= 5E-2, help= 'learning rate')
-parser.add_argument('--use_gpu', action= 'store_true', default= True, help= 'whether to use gpu.')
+parser.add_argument('--use_gpu', action= 'store_true', default= False, help= 'whether to use gpu.')
 args = parser.parse_args()
 print(args)
 
 wv_size = 64
 batchsize = 256
 dataDir = os.path.join(PROJECTPATH, 'data')
-configStr= 'test-baseline-1110-1'
+configStr= 'test-baseline-1110-2'
 
 query_feat_dict = {'sparse': {'has_describe': 2},
                    'dense': {
-                       'question_topics_mp': wv_size,
+                       # 'question_topics_mp': wv_size,
                              'invite_count': 1,
                             'describe_W_length': 1,
                              'title_W_length': 1,
@@ -70,8 +71,8 @@ user_feat_dict = {'sparse': {
         # 'accept_ratio': 1,
         'invite_count': 1,
         'salt_value': 1,
-        'follow_topics_mp': wv_size,
-        'interest_topics_wp': wv_size,
+        # 'follow_topics_mp': wv_size,
+        # 'interest_topics_wp': wv_size,
         'gender_count': 1,
         'visit_freq_count': 1,
     }
@@ -116,12 +117,7 @@ if args.use_gpu:
 optimizer = optim.Adam(params= model.parameters(), lr= args.lr)
 
 
-def move_feat_dict_to_gpu(features_dict):
-    for type, type_dict in features_dict.items():
-        for feat, column in type_dict.items():
-            type_dict[feat] = column.cuda()
-        features_dict[type] = type_dict
-    return features_dict
+
 
 
 def loop_dataset(model, dataset, optimizer= None):
@@ -149,14 +145,15 @@ def loop_dataset(model, dataset, optimizer= None):
             loss.backward()
             optimizer.step()
 
-        mean_loss = (i * mean_loss + loss) / (i + 1)
+        mean_loss = (i * mean_loss + loss.cpu().item()) / (i + 1)
         mean_auc = (i * mean_auc + auc_score) / (i + 1)
 
         if i % args.print_every == 0:
             print("%d / %d: loss %.4f auc %.4f" %(i, num_batches, mean_loss, mean_auc))
 
-        # if i > 64:
-        #     break
+        # if optimizer is not None:
+        #     if i > 64:
+        #         break
 
     return mean_loss, mean_auc
 

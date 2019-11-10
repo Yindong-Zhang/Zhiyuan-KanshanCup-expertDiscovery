@@ -6,6 +6,7 @@ from sklearn.metrics import roc_auc_score
 import pandas as pd
 import os
 from src.config import DAYFIRST, PROJECTPATH
+from src.train_utils import move_feat_dict_to_gpu
 import torch
 from torch import optim, nn
 import argparse
@@ -18,12 +19,14 @@ parser.add_argument('--patience', type= int, default= 1, help= 'patience epoche 
 parser.add_argument('--pretrain', action= 'store_true', default= False,  help= 'whether to user pretrained model')
 parser.add_argument('--weight_decay', type= float, default= 1E-6, help= 'weight decay for user index embedding')
 parser.add_argument('--lr', type= float, default= 5E-2, help= 'learning rate')
+parser.add_argument('--use_gpu', action= 'store_true', default= True, help= 'whether to use gpu.')
+
 args = parser.parse_args()
 print(args)
 
 wv_size = 64
-max_hist_len = 16
-batchsize = 512
+max_hist_len = 12
+batchsize = 256
 dataDir = os.path.join(PROJECTPATH, 'data')
 configStr= 'test-DIN-1109'
 
@@ -67,6 +70,7 @@ user_feat_dict = {'sparse': {
     'dense': {
         # 'answer_count': 1,
         # 'accept_ratio': 1,
+        'invite_count': 1,
         'salt_value': 1,
         'follow_topics_mp': wv_size,
         'interest_topics_wp': wv_size,
@@ -105,7 +109,9 @@ else:
               user_embed_dim= user_embed_dim,
               embed_size=16,
               hidden_dim_list=[1024, 20, 1],
-              device='cpu')
+              device= 'cuda' if args.use_gpu else 'cpu')
+if args.use_gpu:
+    model = model.cuda()
 
 optimizer = optim.Adam(params= model.parameters(), lr= args.lr)
 
@@ -117,24 +123,32 @@ def loop_dataset(model, dataset, optimizer= None):
 
         quest_feats, hist_quest_feats, hist_len, user_feats, context_feats, target = batch
 
+        if args.use_gpu:
+            quest_feats = move_feat_dict_to_gpu(quest_feats)
+            user_feats = move_feat_dict_to_gpu(user_feats)
+            hist_quest_feats = hist_quest_feats.cuda()
+            hist_len = hist_len.cuda()
+            context_feats = move_feat_dict_to_gpu(context_feats)
+            target= target.cuda()
+
         predict = model(quest_feats, hist_quest_feats, hist_len, user_feats, context_feats)
         # print(predict, target)
         loss = nn.BCELoss()(predict, target)
-        auc_score = roc_auc_score(target, predict.detach())
+        auc_score = roc_auc_score(target.cpu(), predict.detach().cpu())
 
         if optimizer is not None:
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-        mean_loss = (i * mean_loss + loss) / (i + 1)
+        mean_loss = (i * mean_loss + loss.cpu().item()) / (i + 1)
         mean_auc = (i * mean_auc + auc_score) / (i + 1)
 
         if i % args.print_every == 0:
             print("%d / %d: loss %.4f auc %.4f" %(i, num_batches, mean_loss, mean_auc))
 
-        # if i > 64:
-        #     break
+        if i > 64:
+            break
 
     return mean_loss, mean_auc
 
@@ -171,8 +185,15 @@ res_list = []
 for i, batch in enumerate(test_dataset):
     quest_feats, hist_quest_feats, hist_len, user_feats, context_feats= batch
 
+    if args.use_gpu:
+        quest_feats = move_feat_dict_to_gpu(quest_feats)
+        user_feats = move_feat_dict_to_gpu(user_feats)
+        hist_quest_feats = hist_quest_feats.cuda()
+        hist_len = hist_len.cuda()
+        context_feats = move_feat_dict_to_gpu(context_feats)
+
     predict = model(quest_feats, hist_quest_feats, hist_len, user_feats, context_feats)
-    res_list.extend(predict.detach().numpy().squeeze().tolist())
+    res_list.extend(predict.detach().cpu().numpy().squeeze().tolist())
     if i % args.print_every == 0:
         print('%d / %d predicted' %(i, len(test_dataset)))
 
