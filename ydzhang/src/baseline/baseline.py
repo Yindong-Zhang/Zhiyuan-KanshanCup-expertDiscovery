@@ -19,13 +19,13 @@ class Baseline(nn.Module):
                  device, **kwargs):
         super(Baseline, self).__init__(**kwargs)
         self.embed_size = embed_size
-        self.user_profile_dim = user_profile_dim
-        self.query_embed_dim = query_embed_dim
+        self.user_profile_dim = self.embed_size * len(user_feat_dict['sparse']) + sum(user_feat_dict['dense'].values())
+        self.query_embed_dim = self.embed_size * len(query_feat_dict['sparse']) + sum(query_feat_dict['dense'].values())
         self.context_embed_dim = self.embed_size * len(context_feat_dict['sparse']) + sum(context_feat_dict['dense'].values())
         self.device = device
-        self.query_features_extract_layer = EmbeddingMLPLayer(query_feat_dict,
-                                                              embedding_size= self.embed_size, mlp_hidden_list= [self.query_embed_dim, ])
-        self.user_feature_extract_layer= EmbeddingMLPLayer(user_feat_dict, embedding_size= self.embed_size, mlp_hidden_list= [self.user_profile_dim, ])
+        self.query_features_extract_layer = EmbeddingConcatLayer(query_feat_dict,
+                                                              embedding_size= self.embed_size)
+        self.user_feature_extract_layer= EmbeddingConcatLayer(user_feat_dict, embedding_size= self.embed_size)
         self.context_feat_layer = EmbeddingConcatLayer(context_feat_dict, embedding_size= self.embed_size, )
         self.interaction_layer = FullyConnectedLayer(self.query_embed_dim + self.user_profile_dim + self.context_embed_dim, hidden_size= hidden_dim_list, activation= 'relu', sigmoid= True)
 

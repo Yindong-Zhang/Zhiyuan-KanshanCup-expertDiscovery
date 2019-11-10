@@ -1,4 +1,5 @@
 from src.datasets import create_feat_dict
+from sklearn.preprocessing import MinMaxScaler
 import os
 import pandas as pd
 import numpy as np
@@ -81,7 +82,7 @@ def create_train_val_test_dataset(dataDir,
                                  # nrows= 10000,
                             index_col= 0,
                                  )
-    user_df = pd.read_csv(os.path.join(dataDir, 'member_info_1106.csv'),
+    user_df = pd.read_csv(os.path.join(dataDir, 'member_info_1109.csv'),
                                # usecols= ['user_id', 'gender', 'visit_freq', 'binary_A',
                                #        'binary_B', 'binary_C', 'binary_D', 'binary_E',
                                #        'category_A',
@@ -97,7 +98,7 @@ def create_train_val_test_dataset(dataDir,
     user_array_dict = {'follow_topics_mp': user_follow_topics_mp,
                             'interest_topics_wp': user_interest_topics_wp
                             }
-    quest_df = pd.read_csv(os.path.join(dataDir, 'question_info_1106.csv'),
+    quest_df = pd.read_csv(os.path.join(dataDir, 'question_info_1109.csv'),
                                 # usecols= ['question_id', 'title_SW', 'title_W', 'question_topics_mp', 'title_W_ind', 'create_day',
                                 #           'has_describe', 'describe_length'],
                                 index_col='question_id',

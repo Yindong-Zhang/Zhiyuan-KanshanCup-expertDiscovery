@@ -17,17 +17,19 @@ parser.add_argument('--patience', type= int, default= 1, help= 'patience epoche 
 parser.add_argument('--pretrain', action= 'store_true', default= False,  help= 'whether to user pretrained model')
 parser.add_argument('--weight_decay', type= float, default= 1E-6, help= 'weight decay for user index embedding')
 parser.add_argument('--lr', type= float, default= 5E-2, help= 'learning rate')
+parser.add_argument('--use_gpu', action= 'store_true', default= True, help= 'whether to use gpu.')
 args = parser.parse_args()
 print(args)
 
 wv_size = 64
-max_hist_len = 16
 batchsize = 256
 dataDir = os.path.join(PROJECTPATH, 'data')
-configStr= 'test-baseline-1108-1'
+configStr= 'test-baseline-1110-1'
 
 query_feat_dict = {'sparse': {'has_describe': 2},
-                   'dense': {'question_topics_mp': wv_size,
+                   'dense': {
+                       'question_topics_mp': wv_size,
+                             'invite_count': 1,
                             'describe_W_length': 1,
                              'title_W_length': 1,
                              }
@@ -66,15 +68,19 @@ user_feat_dict = {'sparse': {
     'dense': {
         # 'answer_count': 1,
         # 'accept_ratio': 1,
+        'invite_count': 1,
         'salt_value': 1,
         'follow_topics_mp': wv_size,
         'interest_topics_wp': wv_size,
+        'gender_count': 1,
+        'visit_freq_count': 1,
     }
 }
 
 context_feat_dict = {
     'sparse': {
         'create_hour': 25,
+        'create_weekday': 7,
     },
     'dense': {
         # 'days_since_last_ans': 1,
@@ -87,7 +93,7 @@ train_dataset, val_dataset, test_dataset = create_train_val_test_dataset(dataDir
                                                            quest_dim_dict= query_feat_dict,
                                                            user_dim_dict= user_feat_dict,
                                                                          context_dim_dict= context_feat_dict,
-                                                           train_day_range= [DAYFIRST + 1, DAYFIRST + 25],
+                                                           train_day_range= [DAYFIRST + 10, DAYFIRST + 25],
                                                            val_day_range= [DAYFIRST + 25, DAYFIRST + 30],
                                                            )
 
@@ -102,9 +108,21 @@ else:
               query_embed_dim, user_embed_dim,
               embed_size=16,
               hidden_dim_list=[1024, 20, 1],
-              device='cpu')
+              device= 'cuda' if args.use_gpu else 'cpu')
+
+if args.use_gpu:
+    model = model.cuda()
 
 optimizer = optim.Adam(params= model.parameters(), lr= args.lr)
+
+
+def move_feat_dict_to_gpu(features_dict):
+    for type, type_dict in features_dict.items():
+        for feat, column in type_dict.items():
+            type_dict[feat] = column.cuda()
+        features_dict[type] = type_dict
+    return features_dict
+
 
 def loop_dataset(model, dataset, optimizer= None):
     num_batches = len(dataset)
@@ -114,10 +132,17 @@ def loop_dataset(model, dataset, optimizer= None):
 
         quest_feats, user_feats, context_feats, target = batch
 
+
+        if args.use_gpu:
+            quest_feats = move_feat_dict_to_gpu(quest_feats)
+            user_feats = move_feat_dict_to_gpu(user_feats)
+            context_feats = move_feat_dict_to_gpu(context_feats)
+            target= target.cuda()
+
         predict = model(quest_feats, user_feats, context_feats)
         # print(predict, target)
         loss = nn.BCELoss()(predict, target)
-        auc_score = roc_auc_score(target, predict.detach())
+        auc_score = roc_auc_score(target.cpu(), predict.detach().cpu())
 
         if optimizer is not None:
             optimizer.zero_grad()
@@ -168,8 +193,13 @@ res_list = []
 for i, batch in enumerate(test_dataset):
     quest_feats, user_feats, context_feats= batch
 
+    if args.use_gpu:
+        quest_feats = move_feat_dict_to_gpu(quest_feats)
+        user_feats = move_feat_dict_to_gpu(user_feats)
+        context_feats = move_feat_dict_to_gpu(context_feats)
+
     predict = model(quest_feats, user_feats, context_feats)
-    res_list.extend(predict.detach().numpy().squeeze().tolist())
+    res_list.extend(predict.detach().cpu().numpy().squeeze().tolist())
     if i % args.print_every == 0:
         print('%d / %d predicted' %(i, len(test_dataset)))
 

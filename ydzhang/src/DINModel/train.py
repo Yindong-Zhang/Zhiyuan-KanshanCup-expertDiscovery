@@ -23,7 +23,7 @@ print(args)
 
 wv_size = 64
 max_hist_len = 16
-batchsize = 256
+batchsize = 512
 dataDir = os.path.join(PROJECTPATH, 'data')
 configStr= 'test-DIN-1109'
 
