@@ -25,16 +25,16 @@ class DINModel(nn.Module):
         super(DINModel, self).__init__(**kwargs)
         self.embed_size = embed_size
         self.hist_embed_dim = hist_embed_dim
-        self.user_profile_dim = user_embed_dim
-        self.query_embed_dim = query_embed_dim
+        self.user_profile_dim = self.embed_size * len(user_dim_dict['sparse']) + sum(user_dim_dict['dense'].values())
+        self.query_embed_dim = self.embed_size * len(query_dim_dict['sparse']) + sum(query_dim_dict['dense'].values())
         self.context_embed_dim = self.embed_size * len(context_dim_dict['sparse']) + sum(context_dim_dict['dense'].values())
 
-        self.embed_size = embed_size
         self.device = device
-        self.query_features_extract_layer = EmbeddingMLPLayer(query_dim_dict,
-                                                              embedding_size= self.embed_size, mlp_hidden_list= [self.query_embed_dim, ])
+        self.query_features_extract_layer = EmbeddingConcatLayer(query_dim_dict,
+                                                              embedding_size= self.embed_size)
         # self.hist_features_extract_layer = EmbeddingMLPLayer(history_feat_dict, embedding_size= self.embed_size, mlp_hidden_list= [self.hist_embed_dim, ])
-        self.user_feature_extract_layer= EmbeddingMLPLayer(user_dim_dict, embedding_size= self.embed_size, mlp_hidden_list= [self.user_profile_dim, ])
+        self.user_feature_extract_layer= EmbeddingConcatLayer(user_dim_dict,
+                                                              embedding_size= self.embed_size)
         self.context_feat_layer = EmbeddingConcatLayer(context_dim_dict, embedding_size= self.embed_size, )
 
         self.sequenceAttentionPoolingLayer= SequenceAttentionPoolingLayer(self.query_embed_dim, self.hist_embed_dim)
@@ -56,7 +56,7 @@ class DINModel(nn.Module):
 
         hist_pooled_embedding = self.sequenceAttentionPoolingLayer(query_feat_embed, hist_features, hist_length)
         # print('number of zero length history %d' %(torch.sum(hist_length == 0), ))
-        hist_pooled_embedding = torch.where(hist_length == 0, hist_pooled_embedding, self.no_hist_embedding) # amazing shape broadcast
+        # hist_pooled_embedding = torch.where(hist_length == 0, hist_pooled_embedding, self.no_hist_embedding) # amazing shape broadcast
 
         context_feat_embed = self.context_feat_layer(context_features)
 

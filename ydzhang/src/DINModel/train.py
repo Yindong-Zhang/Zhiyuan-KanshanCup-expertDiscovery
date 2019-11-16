@@ -26,14 +26,16 @@ print(args)
 
 wv_size = 64
 max_hist_len = 12
-batchsize = 256
+batchsize = 512
 dataDir = os.path.join(PROJECTPATH, 'data')
-configStr= 'test-DIN-1109'
+configStr= 'test-DIN-1111'
 
 query_feat_dict = {'sparse': {'has_describe': 2},
-                   'dense': {'question_topics_mp': wv_size,
+                   'dense': {'question_topics_mp': WVSIZE * 3,
                             'describe_W_length': 1,
                              'title_W_length': 1,
+                             'question_topics_length': 1,
+                             'invite_count_scaled': 1,
                              }
                    }
 # history_feat_dict = {'sparse': {
@@ -72,16 +74,18 @@ user_feat_dict = {'sparse': {
         # 'accept_ratio': 1,
         'invite_count': 1,
         'salt_value': 1,
-        'follow_topics_mp': wv_size,
-        'interest_topics_wp': wv_size,
+        'follow_topics_mp': WVSIZE * 3,
+        'interest_topics_wp': WVSIZE,
     }
 }
 
 context_feat_dict = {
     'sparse': {
         'create_hour': 25,
+        'create_weekday': 7
     },
     'dense': {
+        # TODO: days_since_quest_create
         # 'days_since_last_ans': 1,
         # 'days_since_last_ans_scaled': 1,
     }
@@ -105,10 +109,10 @@ if args.pretrain:
 else:
     model = DINModel(query_feat_dict, user_feat_dict, context_feat_dict,
               query_embed_dim= query_embed_dim,
-              hist_embed_dim= WVSIZE,
+              hist_embed_dim= WVSIZE * 3,
               user_embed_dim= user_embed_dim,
               embed_size=16,
-              hidden_dim_list=[1024, 20, 1],
+              hidden_dim_list=[1024, 64, 1],
               device= 'cuda' if args.use_gpu else 'cpu')
 if args.use_gpu:
     model = model.cuda()
@@ -147,8 +151,8 @@ def loop_dataset(model, dataset, optimizer= None):
         if i % args.print_every == 0:
             print("%d / %d: loss %.4f auc %.4f" %(i, num_batches, mean_loss, mean_auc))
 
-        if i > 64:
-            break
+        # if i > 64:
+        #     break
 
     return mean_loss, mean_auc
 

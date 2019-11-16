@@ -106,7 +106,7 @@ def create_train_val_test_dataset(dataDir,
     user_array_dict = {'follow_topics_mp': user_follow_topics_mp,
                             'interest_topics_wp': user_interest_topics_wp
                             }
-    quest_df = pd.read_csv(os.path.join(dataDir, 'question_info_1106.csv'),
+    quest_df = pd.read_csv(os.path.join(dataDir, 'question_info_1111.csv'),
                                 # usecols= ['question_id', 'title_SW', 'title_W', 'question_topics_mp', 'title_W_ind', 'create_day',
                                 #           'has_describe', 'describe_length'],
                                 index_col='question_id',
