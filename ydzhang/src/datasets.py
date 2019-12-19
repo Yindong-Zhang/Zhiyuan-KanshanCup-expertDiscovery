@@ -27,6 +27,9 @@ def create_feat_dict(feat_dim_dict, batch_feat_df, array_dict):
 
 
 class Dataset():
+    """
+    dataset prototype, unacceptable slow, faster one can be seen in baseline/dataset and DINModel/dataset
+    """
     def __init__(self, invite_df, user_df, user_array_dict,  quest_df, quest_array_dict, ans_df, user_hist_dict,
                  batchsize,
                  question_feat_dict,
